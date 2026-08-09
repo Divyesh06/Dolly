@@ -7,14 +7,9 @@ const PROBE_ATTEMPTS = 5;
 const PROBE_INTERVAL_MS = 80;
 /** Chrome rounds the emulated surface, so a pixel or two off is expected. */
 const PROBE_TOLERANCE_PX = 2;
-/** Relayout needs a beat before the first frame is meaningful. */
 const RELAYOUT_SETTLE_MS = 150;
-/**
- * A screenshot needs the compositor to hand over a frame, which a wedged page
- * may never do. Dropping one frame beats blocking the export on it.
- */
+/** A wedged page may never hand over a frame; dropping one beats blocking. */
 const CAPTURE_TIMEOUT_MS = 2000;
-
 
 export type CaptureSessionOptions = {
   targetTabId: number;
@@ -41,9 +36,7 @@ export type CaptureSession = {
 /**
  * Attach the debugger and pin the tab's viewport to the frame's CSS size at the
  * device scale the requested output needs, so the camera's transform rasters at
- * `deviceScaleFactor × cameraScale` real pixels. No teardown of its own: the
- * emulation stays so the page keeps laying out at the frame size, and
- * `releaseTab` is what clears it.
+ * `deviceScaleFactor × cameraScale` real pixels. `releaseTab` clears it.
  */
 export async function openCaptureSession(
   opts: CaptureSessionOptions,
@@ -74,9 +67,9 @@ export async function openCaptureSession(
 
   const grab = async (): Promise<Blob | null> => {
     // Unclipped: a clip crops nothing here but makes Chrome override device
-    // metrics per call, seen as the page flashing between two scales mid-export.
-    // `captureBeyondViewport` is stated rather than defaulted, since the default
-    // has changed across versions and this is the whole point.
+    // metrics per call, which shows up as the page flashing between two scales.
+    // `captureBeyondViewport` is stated rather than defaulted, since its
+    // default has changed across versions.
     const params: Record<string, unknown> = {
       format,
       captureBeyondViewport: false,
@@ -93,8 +86,8 @@ export async function openCaptureSession(
         'Page.captureScreenshot',
       )) as { data?: string } | null;
       if (!shot?.data) return null;
-      // Decoded by `fetch` on a `data:` URL: the base64 is multi-megabyte at 4K,
-      // so an `atob` char loop is real per-frame cost.
+      // `fetch` on a `data:` URL: the base64 is multi-megabyte at 4K, so an
+      // `atob` char loop is real per-frame cost.
       const decoded = await fetch(`data:${mimeType};base64,${shot.data}`);
       return await decoded.blob();
     } catch (err) {
@@ -107,11 +100,9 @@ export async function openCaptureSession(
 
   /**
    * Measure a real frame: Chrome rounds the emulated surface, and the encoder
-   * must be told the truth or every frame gets resampled to fit.
-   *
-   * Probed repeatedly because the override takes a moment to land, and a frame
-   * grabbed before it does comes back at the old scale — which would size the
-   * encoder wrongly and crop or letterbox every frame that follows.
+   * must be told the truth or every frame gets resampled to fit. Probed
+   * repeatedly because the override takes a moment to land, and a frame grabbed
+   * before it does comes back at the old scale.
    */
   const expectedWidth = Math.round(frameWidth * deviceScaleFactor);
   const expectedHeight = Math.round(frameHeight * deviceScaleFactor);
@@ -133,8 +124,8 @@ export async function openCaptureSession(
   if (!measured) {
     throw new Error('every probe screenshot came back empty');
   }
-  // A surface that never reached the requested size is still the best
-  // information available, so the export goes ahead on what was measured.
+  // What was measured is still the best information available, so the export
+  // goes ahead on it.
   if (!onTarget(measured)) {
     console.warn(
       `[Dolly] capture surface settled at ${measured.width}×${measured.height} ` +
@@ -169,9 +160,8 @@ export async function attach(targetTabId: number) {
     await browser.debugger.attach({ tabId: targetTabId }, '1.3');
   } catch (err) {
     const message = String(err);
-    // "Another debugger is already attached" means someone else holds the tab,
-    // almost always DevTools. Checked first, since this message also contains
-    // the "already attached" our own re-attach produces.
+    // Checked first: this message also contains the "already attached" that
+    // our own re-attach produces.
     if (message.includes('Another debugger')) {
       throw new Error(
         'DevTools (or another debugger) is open on the recorded tab, and ' +
@@ -185,7 +175,7 @@ export async function attach(targetTabId: number) {
     }
   }
   // An unfocused tab throttles rendering and drops focus styling; an occluded
-  // one can stop producing frames entirely. Both would show up in the capture.
+  // one can stop producing frames entirely.
   try {
     await browser.debugger.sendCommand(
       { tabId: targetTabId },
@@ -203,15 +193,10 @@ export async function attach(targetTabId: number) {
 }
 
 /**
- * Answer the page's modal dialogs instead of letting them open.
- *
- * `alert`, `confirm` and friends block the renderer outright — no frames, no
- * screenshots, nothing — and left native they open *behind* the curtain, where
- * they can't be dismissed. Enabling the Page domain hands them to the debugger
- * instead, and the page stays blocked until one is answered, so the handler
- * below is what keeps the export moving.
- *
- * Returns the function that stops intercepting.
+ * Answer the page's modal dialogs instead of letting them open. `alert` and
+ * friends block the renderer outright, and left native they open *behind* the
+ * curtain where they can't be dismissed. Enabling the Page domain hands them to
+ * the debugger instead. Returns the function that stops intercepting.
  */
 export async function answerDialogs(
   targetTabId: number,
@@ -224,8 +209,8 @@ export async function answerDialogs(
     if (source.tabId !== targetTabId) return;
     if (method !== 'Page.javascriptDialogOpening') return;
     const dialog = (params ?? {}) as { type?: string; message?: string };
-    // `beforeunload` is answered "stay" — accepting it would navigate away from
-    // the page being recorded. Everything else is dismissed so the shot goes on.
+    // `beforeunload` is answered "stay": accepting would navigate away from
+    // the page being recorded.
     const accept = dialog.type !== 'beforeunload';
     console.warn(
       `[Dolly] the page opened a ${dialog.type ?? 'dialog'} mid-export; ` +

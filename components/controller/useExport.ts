@@ -27,16 +27,10 @@ import { openPageClock, type PageClock } from './virtualClock';
  */
 const CURTAIN_TOP_GAP = 24;
 
-/**
- * The pose ack comes back over `tabs.sendMessage`, which has no timeout of its
- * own — and nothing in the export loop may block for ever.
- */
+/** `tabs.sendMessage` has no timeout of its own. */
 const POSE_TIMEOUT_MS = 1000;
-/** Teardown gets longer than a frame's pose, but never for ever. */
 const CLEANUP_TIMEOUT_MS = 2000;
-/** A phase pending this long is a stall; the watchdog names it in the console. */
 const STALL_LOG_MS = 5000;
-/** A frame slower than this gets its duration logged, to make degradation visible. */
 const SLOW_FRAME_LOG_MS = 2000;
 
 const evenFloor = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
@@ -50,12 +44,10 @@ type StallWatch = {
 };
 
 /**
- * Console diagnostics for a capture that goes wrong.
- *
- * Every phase of the loop is bounded, so a wedged export can't hang — it
- * degrades into something slow instead, which from the progress bar is
- * indistinguishable from a big shot rendering normally. This says which phase
- * is responsible, in the controller's console.
+ * Console diagnostics for a capture that goes wrong. Every phase of the loop is
+ * bounded, so a wedged export degrades into something slow rather than hanging
+ * — which from the progress bar looks like a big shot rendering normally. This
+ * names the phase responsible.
  */
 function watchForStalls(): StallWatch {
   const phase = {
@@ -66,8 +58,7 @@ function watchForStalls(): StallWatch {
   };
   let frameStartedAt = performance.now();
 
-  // Once per stall, not once per tick: a wedged phase would otherwise fill the
-  // console with the same line and bury whatever caused it.
+  // Once per stall, not once per tick, so the cause isn't buried.
   const timer = window.setInterval(() => {
     const pending = performance.now() - phase.since;
     if (pending > STALL_LOG_MS && !phase.warned) {
@@ -87,8 +78,7 @@ function watchForStalls(): StallWatch {
     },
     frame(done) {
       const now = performance.now();
-      // Degradation usually precedes a stall by a few frames, so slow ones are
-      // worth naming even when the export goes on to finish.
+      // Degradation usually precedes a stall by a few frames.
       if (done > 0 && now - frameStartedAt > SLOW_FRAME_LOG_MS) {
         console.warn(
           `[Dolly] frame ${done - 1} took ` +
@@ -251,8 +241,6 @@ export function useExport({
       const tabId = target.tabId;
       const timeline = buildTimeline(regions, frame.width, frame.height);
       const cursorTrack = buildCursorTrack(cursors);
-      // The Export button is disabled with nothing to render, so this is only a
-      // guard against a caller that bypassed it.
       const duration = Math.max(timeline.duration, cursorTrack.duration);
       if (duration <= 0) return;
 
@@ -278,8 +266,8 @@ export function useExport({
           targetWidth: width,
           targetHeight: height,
         });
-        // Encode at the size the capture comes back at, rounded down to even, so
-        // the fit path stays a pure crop and never resamples.
+        // Encode at the size the capture comes back at, so the fit stays a
+        // pure crop and never resamples.
         width = evenFloor(session.width);
         height = evenFloor(session.height);
         console.info(
@@ -287,11 +275,10 @@ export function useExport({
             `${session.deviceScaleFactor.toFixed(4)}× → ${width}×${height}`,
         );
 
-        // A modal blocks the page's main thread, taking the overlay with it,
-        // so dialogs are answered rather than shown.
+        // A modal blocks the page's main thread, taking the overlay with it.
         stopAnsweringDialogs = await answerDialogs(tabId);
 
-        // The page's own animations must advance with the timeline, not with
+        // So the page's animations advance with the timeline rather than with
         // however long each frame takes to capture.
         pageClock = await openPageClock(tabId);
         if (!pageClock) {
@@ -310,18 +297,15 @@ export function useExport({
           height,
           fps: opts.fps,
           applyFrame: async (t) => {
-            // Scripts first and awaited: their changes must be in place before
-            // the pose settles and the frame is grabbed.
+            // Scripts first: their changes must be in place before the pose
+            // settles and the frame is grabbed.
             stalls.mark('scripts');
             await runScriptsBetween(lastTime, t);
-            // Then the page's own clock, so whatever it animates has reached
-            // this instant of the shot before the camera is posed over it.
+            // Then the page's clock, so what it animates has reached this
+            // instant before the camera is posed over it.
             stalls.mark('page clock');
             await pageClock?.step((t - lastTime) * 1000);
             lastTime = t;
-            // The renderer runs on real time throughout, so the overlay's
-            // settle handshake works as it always has: it lives in the
-            // isolated world, whose clocks the page-side patch never touched.
             stalls.mark('pose');
             const res = await withTimeout(
               setPose(cameraAt(timeline, t), cursorAt(cursorTrack, t), true),
@@ -352,12 +336,11 @@ export function useExport({
         failure = String(err);
       } finally {
         stalls.close();
-        // Give the page its clock back first: everything after this wants the
-        // page behaving normally again.
+        // The clock first: everything after this wants the page behaving
+        // normally again.
         await pageClock?.release();
-        // Bounded like the loop itself: a page that has stopped answering is
-        // exactly when an export fails, and the failure still has to be
-        // reported. `pageClock.release` and `releaseTab` bound themselves.
+        // Bounded, because a page that stopped answering is exactly when an
+        // export fails, and the failure still has to be reported.
         await withTimeout(
           stopAnsweringDialogs?.() ?? Promise.resolve(),
           CLEANUP_TIMEOUT_MS,
@@ -368,16 +351,15 @@ export function useExport({
           CLEANUP_TIMEOUT_MS,
           'clearing the pose',
         );
-        // Export is the one path that needs the debugger, for output density.
-        // Detach immediately so its banner doesn't outlive the export.
+        // Detached immediately so the debugger banner doesn't outlive the
+        // export; this is the only path that needs it.
         if (target.tabId != null) await releaseTab(target.tabId);
         abortRef.current = null;
         setIsExporting(false);
       }
 
-      // The curtain reports the outcome, where the user is already looking.
-      // Cancelling wins over any error it caused on the way out: the user asked
-      // for this one, and calling it a failure would be a lie.
+      // Cancelling wins over any error it caused on the way out: calling a
+      // deliberate stop a failure would be a lie.
       const outcome: ExportOutcome = controller.signal.aborted
         ? 'cancelled'
         : failure || !result?.ok

@@ -32,19 +32,14 @@ const BITS_PER_PIXEL = 0.2;
 const MIN_BITRATE = 8_000_000;
 /** How long to wait on a busy encoder before pressing on regardless. */
 const BACKPRESSURE_TIMEOUT_MS = 10_000;
-/**
- * Empty captures in a row that mean the page has stopped answering. Grinding
- * out hundreds more frames at a timeout apiece helps nobody; failing quickly
- * with a reason does.
- */
+/** Empty captures in a row that mean the page has stopped answering. */
 const MAX_CONSECUTIVE_MISSES = 5;
 
 let warnedUndersizedFrame = false;
 
 /**
  * Bring a captured bitmap to the encoder's exact dimensions by cropping, never
- * scaling — resampling would soften every pixel of every frame. No background
- * fill: an undersized capture is an anomaly worth a warning, not a white edge.
+ * scaling — resampling would soften every pixel of every frame.
  */
 function cropToSize(
   bitmap: ImageBitmap,
@@ -153,8 +148,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const isAborted = () => aborted || Boolean(abortSignal?.aborted);
 
   // Decode and encode run behind the capture loop, which is mostly waiting on
-  // the compositor and CDP. The chain keeps frames in the order the encoder
-  // requires while frame N decodes as N+1 is posed.
+  // the compositor and CDP. The chain keeps frames in encoder order while
+  // frame N decodes as N+1 is posed.
   let handoff: Promise<void> = Promise.resolve();
   let queued = 0;
 
@@ -187,9 +182,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       await applyFrame(n / fps);
       if (isAborted()) break;
 
-      // Backpressure: don't outrun the encoder, and don't let undecoded frames
-      // pile up — at 4K each one is megabytes still in memory. Bounded, so a
-      // stalled encoder slows the export instead of wedging it.
+      // Backpressure: undecoded frames are megabytes apiece at 4K. Bounded, so
+      // a stalled encoder slows the export instead of wedging it.
       const backpressureStart = performance.now();
       while ((encoder.encodeQueueSize > 6 || queued > 3) && !isAborted()) {
         if (performance.now() - backpressureStart > BACKPRESSURE_TIMEOUT_MS) {
@@ -219,8 +213,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     await handoff;
     aborted = isAborted();
   } catch (err) {
-    // Caught explicitly: the `return` in the `finally` below would otherwise
-    // swallow it and report success with silently missing frames.
+    // Caught explicitly: the `return` in the `finally` below would swallow it
+    // and report success with silently missing frames.
     loopError = String(err);
   } finally {
     const captureMs = performance.now() - startTime;

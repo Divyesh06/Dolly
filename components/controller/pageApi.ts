@@ -4,23 +4,17 @@ import { withTimeout } from '@/lib/async';
 /**
  * `window.Dolly` — the helpers a script keyframe can call.
  *
- * Keyframes are synchronous: they run at one instant of the shot and the
- * capture moves on. That leaves no way to write something that takes time,
- * which is most of what a demo wants to show. These helpers close that gap by
- * *scheduling* rather than waiting — they set their work on the page's timers
- * and return at once, and during an export those timers are the stepped ones,
- * so the typing and the animations play out over video time no matter how long
- * each frame took to capture.
- *
- * Installed into the page's own world, so a snippet can reach it, and paired
- * with animate.css for the effect library.
+ * Keyframes are synchronous, which leaves no way to write something that takes
+ * time. These close that gap by scheduling rather than waiting: they set their
+ * work on the page's timers and return at once, and during an export those
+ * timers are the stepped ones, so the result plays out over video time.
  */
 
 const INSTALL_TIMEOUT_MS = 3000;
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Injected into the page. Serialised and re-parsed there, so it closes over
- * nothing: everything it needs is declared inside it.
+ * nothing — everything it needs is declared inside it.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** Returns true if this call is what installed it, false if it was there. */
@@ -49,12 +43,9 @@ function installDollyApi(): boolean {
     isField(el) ? el.value : (el.textContent ?? '');
 
   /**
-   * Put `text` in the element as though it had been typed.
-   *
-   * Frameworks that own an input's value — React above all — track it through
-   * the prototype's setter and never see a plain `el.value = x`. Going through
-   * the setter, then dispatching `input`, is what makes the change real to
-   * them rather than something the next render wipes out.
+   * Put `text` in the element as though it had been typed. Frameworks that own
+   * an input's value — React above all — track it through the prototype's
+   * setter and never see a plain `el.value = x`.
    */
   const write = (el: HTMLElement, text: string, last: boolean) => {
     if (isField(el)) {
@@ -66,8 +57,7 @@ function installDollyApi(): boolean {
       if (setter) setter.call(el, text);
       else el.value = text;
       el.dispatchEvent(new Event('input', { bubbles: true }));
-      // Validation and "save on blur" logic usually hangs off `change`, and it
-      // belongs at the end of the phrase rather than after every letter.
+      // `change` belongs at the end of the phrase, not after every letter.
       if (last) el.dispatchEvent(new Event('change', { bubbles: true }));
       return;
     }
@@ -100,8 +90,7 @@ function installDollyApi(): boolean {
       const opts = options ?? {};
 
       if (opts.focus !== false) {
-        // Never let focus scroll the page: the camera decides what is on
-        // screen, and a scroll under it would move the shot.
+        // Never let focus scroll the page; the camera decides the framing.
         try {
           el.focus({ preventScroll: true });
         } catch {
@@ -124,7 +113,7 @@ function installDollyApi(): boolean {
         const shown = base + value.slice(0, i);
         const last = i === value.length;
         // The page's own timer, read live: during an export that is the
-        // stepped clock, so these land on the frames they belong to.
+        // stepped clock.
         setTimeout(() => write(el, shown, last), Math.round(perCharacter * i));
       }
     },
@@ -136,10 +125,9 @@ function installDollyApi(): boolean {
      *
      * Every effect at https://animate.style works, named as it is there, with
      * or without the `animate__` prefix. Options: `delay` in ms, `repeat` as a
-     * count or 'infinite', and `hold` to decide whether the element keeps the
-     * effect's final state — by default it does for the exit effects (the
-     * `…Out` family and `hinge`, which would otherwise snap back into view)
-     * and reverts for the rest.
+     * count or 'infinite', and `hold` to keep the effect's final state —
+     * defaulting to true for exit effects, which would otherwise snap back
+     * into view.
      */
     animate(
       target: Target,
@@ -160,9 +148,8 @@ function installDollyApi(): boolean {
       const opts = options ?? {};
       const delay = Math.max(0, Number(opts.delay) || 0);
 
-      // Clear first, then force a reflow: re-adding a class the element
-      // already carries does not restart a CSS animation, so playing the same
-      // effect twice would do nothing the second time.
+      // Clear, then force a reflow: re-adding a class the element already
+      // carries does not restart a CSS animation.
       el.classList.remove('animate__animated', className);
       void el.offsetWidth;
 
@@ -175,8 +162,7 @@ function installDollyApi(): boolean {
 
       const exits = /out|hinge/i.test(name);
       const hold = opts.hold ?? exits;
-      // Held by simply leaving the class on: animate.css fills forwards, so
-      // the last frame of the effect is where the element stays.
+      // Held by leaving the class on: animate.css fills forwards.
       if (hold || opts.repeat === 'infinite') return;
 
       setTimeout(() => {
@@ -196,10 +182,8 @@ function installDollyApi(): boolean {
 
 /**
  * Make `window.Dolly` available to script keyframes in the recorded page.
- *
- * Cheap to call repeatedly: the page reports whether it already had the API,
- * and the stylesheet only follows a fresh install — which is also what makes
- * this correct across a navigation, since the new document has neither.
+ * Cheap to call repeatedly: the stylesheet only follows a fresh install, which
+ * is also what makes it correct across a navigation.
  */
 export async function installPageApi(targetTabId: number): Promise<boolean> {
   try {

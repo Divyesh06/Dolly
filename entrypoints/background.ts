@@ -1,10 +1,10 @@
 ﻿import { OVERLAY_CHANNEL } from '@/lib/protocol';
 
 /**
- * Launcher and janitor. The controller popup owns the session and drives CDP,
- * the camera and the capture itself; the background only opens a session and
- * tears one down if the controller dies without cleaning up. Session facts live
- * in `storage.session` so they survive the service worker being torn down.
+ * Launcher and janitor. The controller owns the session and drives CDP, the
+ * camera and the capture; this only opens a session and tears one down if the
+ * controller dies without cleaning up. Session facts live in `storage.session`
+ * so they survive the worker being torn down.
  */
 
 /** Provisional — the controller re-places itself on mount. */
@@ -25,9 +25,8 @@ async function readSession(): Promise<StoredSession | null> {
   return (bag[STORE_KEY] as StoredSession | undefined) ?? null;
 }
 
-// The overlay is not in the manifest — pages the user isn't recording never run
-// Dolly code — so injection is explicit, and safe to repeat: the script bails if
-// a copy is already running.
+// Not in the manifest, so pages the user isn't recording never run Dolly code.
+// Safe to repeat: the script bails if a copy is already running.
 async function injectOverlay(tabId: number): Promise<boolean> {
   try {
     await browser.scripting.executeScript({
@@ -79,8 +78,8 @@ async function endSession(session: StoredSession) {
     /* tab already gone, or never had the overlay */
   }
 
-  // Emulation and the attachment belong to the extension, not the context
-  // that created them, so they can be undone from here.
+  // Emulation and the attachment belong to the extension rather than the
+  // context that created them, so they can be undone from here.
   try {
     await browser.debugger.sendCommand(
       { tabId: session.targetTabId },
@@ -148,9 +147,9 @@ export default defineBackground(() => {
     const originWindowId = tab.windowId;
     const originIndex = tab.index;
 
-    // Move the tab — not a copy — into a chrome-less popup: no omnibox or tab
-    // strip is 80-110px of screen back for the frame, and moving preserves the
-    // page's state where reopening the URL would not.
+    // Moved, not copied, into a chrome-less popup: dropping the omnibox and tab
+    // strip gives the frame 80-110px back, and moving preserves the page's
+    // state where reopening the URL would not.
     let pageWindow;
     try {
       pageWindow = await browser.windows.create({

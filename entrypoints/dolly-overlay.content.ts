@@ -17,21 +17,19 @@ import { commandForKey, isEditableTarget } from '@/lib/shortcuts';
 
 /**
  * Dolly's footprint inside the recorded page: the camera, and the focus
- * rectangles you drag to place it. The page is the top-level document, so the
- * camera transform on its root rasters at the page's own device scale. The tab
- * is emulated to exactly the frame's CSS size, so the viewport and the frame
- * are the same coordinate space and regions need no translation.
+ * rectangles you drag to place it. The tab is emulated to exactly the frame's
+ * CSS size, so the viewport and the frame share a coordinate space and regions
+ * need no translation.
  */
 export default defineContentScript({
   matches: ['<all_urls>'],
   /** Not in the manifest: the background injects this only during a session. */
   registration: 'runtime',
   main() {
-    // Top documents only — cheap insurance should the injection target change.
     if (window.self !== window.top) return;
 
-    // Injection can repeat within a document (icon re-click, or a re-inject
-    // racing a BFCache restore) and a second copy would double every listener.
+    // Injection can repeat within a document, and a second copy would double
+    // every listener.
     const globals = globalThis as Record<string, unknown>;
     if (globals.__dollyOverlayLoaded) return;
     globals.__dollyOverlayLoaded = true;
@@ -44,11 +42,7 @@ export default defineContentScript({
       willChange: string;
       overflow: string;
       scrollbarGutter: string;
-      /**
-       * Scroll position when the session began, frozen so a shot stays
-       * consistent. Regions are in document coordinates; the root transform
-       * applies relative to the root's box, at minus this offset.
-       */
+      /** Frozen at session start, so a shot stays consistent. */
       scrollX: number;
       scrollY: number;
     };
@@ -70,12 +64,12 @@ export default defineContentScript({
         scrollY: window.scrollY,
       };
       // Scaling the root manufactures viewport overflow, whose scrollbars would
-      // shrink the layout viewport and reflow the page mid-shot. Suppress them,
-      // but reserve the gutter so a page that had one keeps its content width.
+      // reflow the page mid-shot. The gutter stays reserved so a page that had
+      // one keeps its content width.
       root.style.overflow = 'hidden';
       root.style.setProperty('scrollbar-gutter', 'stable');
       // Never hint `will-change: transform`: it pins the layer's raster scale,
-      // which is exactly the blur the camera is trying to avoid.
+      // which is the blur the camera is trying to avoid.
       root.style.willChange = 'auto';
     };
 
@@ -103,7 +97,7 @@ export default defineContentScript({
       shadow.append(style, mount);
       // Appended to <html>, not <body>: an absolutely positioned child of the
       // root resolves against the initial containing block, so its coordinates
-      // are document coordinates rather than the body's positioning or margin.
+      // are document coordinates.
       root.appendChild(host);
       return host;
     };
@@ -123,10 +117,9 @@ export default defineContentScript({
       new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
     /**
-     * Wait for the transform to paint, plus `frames` more, so the compositor can
-     * re-raster at the new scale before capture. The first frame is uncounted: a
-     * rAF callback runs before its own frame paints. rAF rather than a
-     * macrotask, since raster threads need wall-clock time.
+     * Wait for the transform to paint, plus `frames` more, so the compositor
+     * can re-raster at the new scale before capture. The first is uncounted: a
+     * rAF callback runs before its own frame paints.
      */
     const settle = async (frames: number) => {
       await frame();
@@ -186,8 +179,8 @@ export default defineContentScript({
 
     /**
      * Put the page into one instant of the shot. A live pose means playback or
-     * capture: editing chrome goes, and the cursor — part of the output —
-     * appears instead. Returns false for a camera that isn't finite.
+     * capture: editing chrome goes and the cursor appears instead. Returns
+     * false for a camera that isn't finite.
      */
     const applyPose = (
       camera: CameraTransform,
@@ -200,7 +193,7 @@ export default defineContentScript({
       paint();
       beginSession();
       // Document space → root-box space, so the camera can pan anywhere in the
-      // document, including content scrolled out of view, without scrolling.
+      // document without the page scrolling.
       const offsetX = tx + (saved?.scrollX ?? 0);
       const offsetY = ty + (saved?.scrollY ?? 0);
       root.style.transformOrigin = '0 0';
@@ -308,10 +301,8 @@ export default defineContentScript({
     });
 
     /**
-     * Editing shortcuts, forwarded from the page: it holds focus while you drag
-     * regions, so the controller's key handler never sees these. Capture phase,
-     * to get ahead of the page's own handlers. Commands below are inert without
-     * a selection.
+     * Editing shortcuts forwarded from the page, which holds focus while you
+     * drag regions. Capture phase, to get ahead of the page's own handlers.
      */
     const SELECTION_COMMANDS: ReadonlySet<EditCommand> = new Set([
       'delete',
@@ -344,8 +335,8 @@ export default defineContentScript({
       { capture: true },
     );
 
-    // A session outliving a navigation would leave the page transformed with no
-    // controller aware of it.
+    // A session outliving a navigation would leave the page transformed with
+    // no controller aware of it.
     window.addEventListener('pagehide', () => {
       restoreStyles();
       teardownHost();

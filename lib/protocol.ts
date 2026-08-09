@@ -13,10 +13,9 @@ export const SCRIPT_CHANNEL = 'dolly:script';
 export const EXPORT_CHANNEL = 'dolly:export';
 
 /**
- * Extra painted frames the page waits out before reporting a pose settled,
- * counted on top of the one that gets the change on screen at all (so 0 is
- * legal). Trades export time against capturing a frame the compositor hasn't
- * re-rastered yet; each costs ~17ms per exported frame.
+ * Painted frames the page waits out before reporting a pose settled, on top of
+ * the one that gets the change on screen (so 0 is legal). Each costs ~17ms per
+ * exported frame, against the risk of capturing an un-rastered frame.
  */
 export const DEFAULT_SETTLE_FRAMES = 1;
 
@@ -32,11 +31,7 @@ export type CameraTransform = {
 export type OverlayRequest =
   /** Is the overlay listening in this tab? */
   | { channel: typeof OVERLAY_CHANNEL; op: 'hello' }
-  /**
-   * Report the visual viewport, scroll offset and document extents. The
-   * controller sizes the window until the viewport matches the frame, and places
-   * new regions against the scroll offset.
-   */
+  /** Report the visual viewport, scroll offset and document extents. */
   | { channel: typeof OVERLAY_CHANNEL; op: 'measure' }
   /** Draw (or update) the editing chrome: focus rectangles and cursor handles. */
   | {
@@ -49,12 +44,10 @@ export type OverlayRequest =
       selectedId: string | null;
     }
   /**
-   * Set the shot's pose for one instant, or clear it with `camera: null`. Camera
-   * and cursor are sent together because a capture has to see both sampled from
-   * the same moment. Editing chrome hides while a pose is active; the cursor is
-   * output, not chrome, and stays visible. With `settle`, the response is
-   * withheld until the page re-rasters. The translation is in document
-   * coordinates; the page adds the scroll offset it froze at session start.
+   * Set the shot's pose for one instant, or clear it with `camera: null`.
+   * Camera and cursor travel together because a capture must see both sampled
+   * from the same moment. With `settle`, the response is withheld until the
+   * page re-rasters. The translation is in document coordinates.
    */
   | {
       channel: typeof OVERLAY_CHANNEL;
@@ -89,10 +82,7 @@ export type OverlayResponse = {
 
 // ── target page → controller ──────────────────────────────────────────────
 
-/**
- * Editing actions the recorded page can ask for. The page window holds focus
- * while you work on the regions, so the shortcuts must be reachable from there.
- */
+/** Editing actions the recorded page can ask for; it holds focus while you drag. */
 export type EditCommand =
   | 'copy'
   | 'cut'
@@ -103,10 +93,7 @@ export type EditCommand =
   | 'undo'
   | 'redo';
 
-/**
- * Fields an in-page drag can change, across every effect kind. The id says which
- * effect it is; the controller resolves it against the collection holding it.
- */
+/** Fields an in-page drag can change, across every effect kind. */
 export type EffectPatch = Partial<
   Pick<FocusRegion, 'startTime' | 'endTime' | 'x' | 'y' | 'width' | 'height'>
 > &
@@ -125,7 +112,7 @@ export type EditNotice =
 // ── script editor window ↔ controller ─────────────────────────────────────
 
 /**
- * The Monaco window is its own extension page and can't share state with the
+ * The editor is its own extension page and can't share state with the
  * controller, so it asks for the snippet it was opened on and hands the edited
  * text back. The controller remains the only owner of the keyframe list.
  */

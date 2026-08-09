@@ -5,31 +5,19 @@ import { withTimeout } from '@/lib/async';
  *
  * The capture loop runs far from real time — a frame costs as long as posing,
  * rastering and screenshotting take — so anything the page animates on its own
- * clock comes out fast-forwarded. Chrome's virtual time (`Emulation
- * .setVirtualTimePolicy`) is the obvious tool and the wrong one: it freezes the
- * renderer's whole scheduler, which in headful Chrome stops the rendering
- * lifecycle without giving us the `HeadlessExperimental.beginFrame` that
- * headless uses to manufacture frames instead. Nothing commits, screenshots
- * come back stale, and compositor-driven animations tick on real vsync anyway.
+ * clock would come out fast-forwarded. `performance.now`, `Date`, the timers
+ * and `requestAnimationFrame` are swapped for ones this module drives, and
+ * every running animation is paused and seeked by hand.
  *
- * So the clock is replaced from inside the page instead. `performance.now`,
- * `Date`, the timers and `requestAnimationFrame` are swapped for ones this
- * module drives, and every running animation is paused and seeked by hand. The
- * renderer keeps running on real time throughout: it still commits, still
- * rasters, still answers screenshots — and Dolly's own overlay, which lives in
- * the isolated content-script world with its own untouched globals, keeps its
- * `requestAnimationFrame` settle handshake.
+ * The renderer keeps running on real time throughout, so it still commits,
+ * rasters and answers screenshots. Dolly's overlay lives in the isolated
+ * content-script world, whose globals this never touches, so its settle
+ * handshake keeps working.
  */
 
-/** Where the page-side clock parks itself. */
 const CLOCK_KEY = '__dollyVirtualClock';
-/**
- * Timer callbacks one step may run before the rest are held over. A page that
- * re-posts a zero-delay timer from its own callback would otherwise spin here
- * for ever, since its next timer is always due at the instant it just reached.
- */
+/** Timer callbacks one step may run before the rest are held over. */
 const MAX_TASKS_PER_STEP = 2000;
-/** Nothing in the capture loop may block for ever, this included. */
 const STEP_TIMEOUT_MS = 2000;
 const INSTALL_TIMEOUT_MS = 3000;
 const RELEASE_TIMEOUT_MS = 2000;
@@ -43,26 +31,17 @@ export type PageClock = {
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Injected into the page. Serialised and re-parsed there, so these close over
- * nothing: everything they need arrives through arguments or `window`.
+ * nothing — a reference to anything in this module throws on injection.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** Swap the page's clocks for ones `stepPageClock` drives. */
 function installPageClock(key: string, maxTasks: number): boolean {
-  // Everything this function needs must be declared inside it: it is
-  // serialised and re-parsed in the page, where the module around it does not
-  // exist. A reference to anything out there throws on injection.
-
-  /**
-   * Times the page may be handed back control within one step, to let a chain
-   * of awaited timers settle. Bounded: a page that schedules a fresh timer
-   * from every continuation would otherwise never quiesce.
-   */
+  /** Times the page may be handed control within one step, to let it quiesce. */
   const MAX_SETTLE_ROUNDS = 8;
 
   const win = window as unknown as Record<string, unknown>;
-  // An export that died before releasing leaves its clock behind. Reusing it
-  // would start this shot on a clock already advanced, with the page's
-  // animations parked wherever that one abandoned them.
+  // An export that died before releasing leaves its clock behind, already
+  // advanced and holding the page's animations wherever it abandoned them.
   const stale = win[key] as { release?: () => void } | undefined;
   if (stale) {
     try {
@@ -81,10 +60,9 @@ function installPageClock(key: string, maxTasks: number): boolean {
     args: unknown[];
   };
 
-  // Captured before anything is patched: the clock's own machinery has to run
-  // on real time, or stepping it would depend on it already being stepped.
-  // Bound, so calling them detached from `window` can't trip an illegal
-  // invocation on a page that has hardened its globals.
+  // Captured before anything is patched: this module's own machinery has to
+  // run on real time. Bound, so a page that has hardened its globals can't
+  // trip an illegal invocation on them.
   const realPerfNow = performance.now.bind(performance);
   const RealDate = Date;
   const realSetTimeout = window.setTimeout.bind(window);
@@ -94,7 +72,6 @@ function installPageClock(key: string, maxTasks: number): boolean {
   const realRaf = window.requestAnimationFrame.bind(window);
   const realCancelRaf = window.cancelAnimationFrame.bind(window);
   const realAttachShadow = Element.prototype.attachShadow;
-  // Restored by name, so the page isn't left with the stand-ins below.
   const realIdle = win.requestIdleCallback;
   const realCancelIdle = win.cancelIdleCallback;
 
@@ -107,15 +84,10 @@ function installPageClock(key: string, maxTasks: number): boolean {
 
   const timers = new Map<number, Timer>();
   let rafs = new Map<number, (t: number) => void>();
-  // Far above any real handle, so a stray clear of one of ours can't cancel a
-  // real timer the page owns (and vice versa).
+  /** Far above any real handle, so the two sets of ids can't collide. */
   let nextHandle = 1e9;
 
-  /**
-   * Where each animation was when first seen, so it can be seeked rather than
-   * having its progress guessed. Weak: a paused animation whose element is gone
-   * must not be kept alive by this.
-   */
+  /** Where each animation stood when first seen, so it can be seeked. */
   const baselines = new WeakMap<Animation, { at: number; time: number }>();
   const shadowRoots = new Set<ShadowRoot>();
   /** Where the clock stood at the previous sync, to bound new animations. */
@@ -130,9 +102,8 @@ function installPageClock(key: string, maxTasks: number): boolean {
     return typeof unit === 'number' ? unit : 0;
   };
 
-  // Shadow trees keep their own animation list, so they have to be found. Once
-  // at install for what already exists, then by patch for what comes later —
-  // which also catches closed roots, unreachable any other way.
+  // Shadow trees keep their own animation list. Walked once for what exists,
+  // then patched for what comes later — which also catches closed roots.
   const findShadowRoots = (root: Document | ShadowRoot) => {
     for (const el of Array.from(root.querySelectorAll('*'))) {
       const nested = (el as Element).shadowRoot;
@@ -173,17 +144,16 @@ function installPageClock(key: string, maxTasks: number): boolean {
   /**
    * Hold every animation at the page's current instant.
    *
-   * CSS animations and transitions run on the compositor against real vsync,
-   * so a swapped-out `performance.now` means nothing to them — they have to be
-   * paused and positioned explicitly. Newly created ones are picked up here
-   * too, which is how a transition started mid-shot gets its start time.
+   * CSS and WAAPI animations run against the document timeline, which no JS
+   * clock reaches, so they have to be paused and positioned explicitly. New
+   * ones are picked up here, which is how a transition started mid-shot gets
+   * its start time.
    */
   const syncAnimations = () => {
     // An animation missing from the last sync began after it, so it can only
-    // legitimately have run for the virtual time since. Left alone it would
-    // report the *real* time it accrued while the export was busy posing and
-    // screenshotting — seconds, for a frame's worth of shot — and would enter
-    // the video already finished.
+    // have run for the virtual time since. Its own `currentTime` reports the
+    // real time it accrued while the export was busy elsewhere, which for one
+    // frame of shot can be seconds.
     const sinceLastSync = virtual - lastSync;
     for (const anim of allAnimations()) {
       try {
@@ -192,8 +162,7 @@ function installPageClock(key: string, maxTasks: number): boolean {
           const elapsed = asMs(anim.currentTime);
           baseline = {
             at: virtual,
-            // Whatever was already running when the clock was installed keeps
-            // its progress; there was no blind window before that.
+            // What was already running at install keeps its progress.
             time: firstSync ? elapsed : Math.min(elapsed, sinceLastSync),
           };
           baselines.set(anim, baseline);
@@ -203,8 +172,7 @@ function installPageClock(key: string, maxTasks: number): boolean {
           typeof anim.playbackRate === 'number' ? anim.playbackRate : 1;
         anim.currentTime = baseline.time + (virtual - baseline.at) * rate;
       } catch {
-        // Scroll-driven and otherwise unseekable animations refuse this; they
-        // don't follow a clock in the first place.
+        /* scroll-driven and other unseekable animations refuse this */
       }
     }
     lastSync = virtual;
@@ -213,17 +181,16 @@ function installPageClock(key: string, maxTasks: number): boolean {
 
   performance.now = () => perfOrigin + virtual;
 
+  // Typed as a bag so the statics can be hung off it; `Date`'s own declaration
+  // marks them read-only.
   const FakeDate = function (this: unknown, ...args: unknown[]) {
-    // Only the argument-less form reads the clock; every other form is a
-    // parse of something the caller already holds.
+    // Only the argument-less form reads the clock.
     if (args.length === 0) {
       return new (RealDate as unknown as new (ms: number) => Date)(
         wallOrigin + virtual,
       );
     }
     return new (RealDate as unknown as new (...a: unknown[]) => Date)(...args);
-    // Typed loosely so the statics below can be hung off it; `Date`'s own
-    // declaration marks them read-only.
   } as unknown as Record<string, unknown>;
   FakeDate.now = () => wallOrigin + virtual;
   FakeDate.parse = RealDate.parse;
@@ -233,8 +200,7 @@ function installPageClock(key: string, maxTasks: number): boolean {
   win.Date = FakeDate;
 
   win.setTimeout = (fn: unknown, ms?: unknown, ...args: unknown[]) => {
-    // A string body is `eval` in disguise and vanishingly rare; let the real
-    // timer have it rather than reimplement it.
+    // A string body is `eval` in disguise; let the real timer have it.
     if (typeof fn !== 'function') {
       return (realSetTimeout as (...a: unknown[]) => number)(fn, ms);
     }
@@ -255,8 +221,7 @@ function installPageClock(key: string, maxTasks: number): boolean {
     if (typeof fn !== 'function') {
       return (realSetInterval as (...a: unknown[]) => number)(fn, ms);
     }
-    // Zero-delay intervals are clamped, as the real ones are, so a step can't
-    // be spun for ever by one timer.
+    // Clamped as the real ones are, so one timer can't spin a step for ever.
     const period = Math.max(1, Number(ms) || 0);
     const handle = nextHandle++;
     timers.set(handle, {
@@ -283,8 +248,7 @@ function installPageClock(key: string, maxTasks: number): boolean {
     (realCancelRaf as (h: unknown) => void)(handle);
   };
 
-  // Idle work is animation-adjacent enough to matter — a page that defers its
-  // work to idle time would otherwise never do it while the clock is ours.
+  // A page that defers work to idle time would never do it otherwise.
   if (typeof realIdle === 'function') {
     win.requestIdleCallback = (cb: unknown) => {
       if (typeof cb !== 'function') return 0;
@@ -315,10 +279,8 @@ function installPageClock(key: string, maxTasks: number): boolean {
   };
 
   /**
-   * Hand control back to the page on a real task, so the microtask checkpoint
-   * runs. Promise continuations — everything downstream of an `await` — only
-   * run once this function's own stack unwinds, so draining timers without
-   * this would leave their `await`s unresolved.
+   * Hand control back on a real task, so the microtask checkpoint runs.
+   * Promise continuations only run once this stack unwinds.
    */
   const yieldToPage = () =>
     new Promise<void>((resolve) => realSetTimeout(() => resolve(), 0));
@@ -356,14 +318,8 @@ function installPageClock(key: string, maxTasks: number): boolean {
 
     // Timers fire at their own due time rather than all at the end of the
     // frame, so a callback that reads the clock sees when it actually ran.
-    //
-    // Drained repeatedly, because firing a timer only *queues* whatever was
-    // awaiting it. That continuation runs at the microtask checkpoint once
-    // this stack unwinds, and page code that sequences its own animation —
-    // `await sleep(200)` between steps is the common shape — schedules the
-    // next timer from there. A single pass would push each link of such a
-    // chain into a later frame, spreading across the shot what the page meant
-    // to happen at one instant.
+    // Drained repeatedly because firing a timer only queues what was awaiting
+    // it, and that continuation commonly schedules the next timer in a chain.
     let fired = 0;
     for (let round = 0; round < MAX_SETTLE_ROUNDS; round++) {
       fired = drainTimers(target, fired);
@@ -374,8 +330,8 @@ function installPageClock(key: string, maxTasks: number): boolean {
     virtual = target;
 
     // One animation frame per exported frame. The queue is taken first, so a
-    // callback that re-registers itself — which is every animation loop — is
-    // served by the next step rather than spinning inside this one.
+    // callback that re-registers itself is served by the next step rather
+    // than spinning inside this one.
     const pending = rafs;
     rafs = new Map();
     const timestamp = perfOrigin + virtual;
@@ -387,13 +343,12 @@ function installPageClock(key: string, maxTasks: number): boolean {
       }
     }
 
-    // Once more, so the frame callbacks' own continuations and DOM writes are
-    // in before the animations are read below and the frame is grabbed.
+    // Once more, so the frame callbacks' continuations and DOM writes land
+    // before the animations are read below.
     await yieldToPage();
     if (released) return;
 
-    // Last, so anything the work above created is caught in this frame rather
-    // than being discovered a frame late.
+    // Last, so anything created above is caught in this frame.
     syncAnimations();
   };
 
@@ -415,8 +370,7 @@ function installPageClock(key: string, maxTasks: number): boolean {
     }
     Element.prototype.attachShadow = realAttachShadow;
 
-    // Hand back what was held, so a page that had work queued isn't left
-    // half-run for the rest of its life.
+    // Hand back what was held, so queued work isn't left half-run.
     for (const timer of timers.values()) {
       try {
         if (timer.interval != null) {
@@ -479,12 +433,10 @@ function releasePageClock(key: string): boolean {
 /* ────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Run one of the functions above in the page's own world, in every frame.
- *
- * Iframes animate too and each has its own clock, so all of them are stepped.
- * Per-frame failures are ignored: a frame that refuses injection shouldn't
- * take the shot down with it — hence "any frame answered", rather than
- * singling one out, since the results come back in no guaranteed order.
+ * Run one of the functions above in the page's own world, in every frame:
+ * iframes animate too, and each has its own clock. Any frame answering counts
+ * as success, since results come back in no guaranteed order and a frame that
+ * refuses injection shouldn't take the shot down with it.
  */
 async function runInPage(
   targetTabId: number,
@@ -514,9 +466,7 @@ async function runInPage(
 
 /**
  * Freeze the recorded page's clock so the export can step it frame by frame.
- *
- * Returns null if the page won't take the clock; the export then runs on real
- * time, which is the old fast-forwarded behaviour.
+ * Returns null if the page won't take the clock, leaving it on real time.
  */
 export async function openPageClock(
   targetTabId: number,
@@ -541,8 +491,8 @@ export async function openPageClock(
         'stepping the page clock',
         STEP_TIMEOUT_MS,
       );
-      // A step that fails means the clock is gone — a navigation, most likely.
-      // Reporting it once beats a warning per remaining frame.
+      // A failed step means the clock is gone, a navigation most likely.
+      // Reported once rather than per remaining frame.
       if (!ok) {
         broken = true;
         console.warn(

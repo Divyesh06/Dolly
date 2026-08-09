@@ -117,11 +117,7 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
     apiReadyRef.current = false;
   }, []);
 
-  /**
-   * Run every script keyframe the playhead just crossed, in time order, and
-   * wait for each to finish in the page before the clock steps and the frame
-   * is posed over it. Snippets are synchronous — see `executeInPage`.
-   */
+  /** Run every script keyframe the playhead just crossed, in time order. */
   const runScriptsBetween = useCallback(
     async (from: number, to: number) => {
       if (target.tabId == null) return;
@@ -133,8 +129,7 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
             !firedRef.current.has(s.id),
         ),
       );
-      // Lazily, on the first keyframe of the take: a shot with no scripts has
-      // no use for the API and shouldn't pay for the stylesheet.
+      // Lazily, so a shot with no scripts never pays for the stylesheet.
       if (due.length > 0 && !apiReadyRef.current) {
         apiReadyRef.current = true;
         await installPageApi(target.tabId);
@@ -143,8 +138,7 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
       for (const script of due) {
         firedRef.current.add(script.id);
         // Bounded: this runs inside the capture loop, where nothing may block
-        // for ever — a page busy enough to swallow an injection would
-        // otherwise take the export with it.
+        // for ever.
         const outcome = await withTimeout(
           executeInPage(target.tabId, script.code),
           SCRIPT_TIMEOUT_MS,
