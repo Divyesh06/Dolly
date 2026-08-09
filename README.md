@@ -6,8 +6,6 @@ Dolly is a Chrome extension that turns a live web page into a cinematic product
 demo. It takes a fundamentally different approach from a screen recorder: it
 renders the page rather than filming it.
 
-> **Screenshot / demo GIF goes here.**
-
 ---
 
 ## Contents
@@ -51,10 +49,8 @@ character, and `Dolly.animate()` plays any of 97
 ## Requirements
 
 - **Google Chrome**, or another Chromium browser — Brave, Edge, Vivaldi. Dolly
-  drives the page through the Chrome DevTools Protocol, which Firefox has no
-  equivalent for; the `dev:firefox` scripts exist, but the export pipeline will
-  not work there.
-- Nothing else, to install a release. Building from source additionally needs
+  drives the page through the Chrome DevTools Protocol.
+- Nothing else to install for a release. Building from source additionally needs
   **Node.js 22+** and **pnpm** (WXT requires it).
 
 ## Installation
