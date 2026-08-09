@@ -17,20 +17,7 @@ export default defineConfig({
       'debugger',
       'tabs',
       'scripting',
-      'activeTab',
-      'downloads',
-      'declarativeNetRequest',
-      'webNavigation',
     ],
     host_permissions: ['<all_urls>'],
-    declarative_net_request: {
-      rule_resources: [
-        {
-          id: 'dolly-frame',
-          enabled: true,
-          path: 'dnr_rules.json',
-        },
-      ],
-    },
   },
 });

@@ -1,0 +1,59 @@
+/**
+ * Dolly's palette, shared by every extension page.
+ *
+ * Each window is a separate document, so this is imported by each entrypoint
+ * ahead of that window's own stylesheet. The overlay can't use it — it renders
+ * inside a shadow root in the recorded page, which knows nothing about these
+ * properties — so `overlayStyles.ts` redeclares the handful it needs on `:host`.
+ */
+:root {
+  --dolly-bg: #16161a;
+  /* Below the background: the window behind the timeline, and tooltip chips. */
+  --dolly-bg-deep: #0a0a0d;
+  --dolly-surface: #1e1e24;
+  --dolly-surface-hover: #26262c;
+  --dolly-divider: #2a2a30;
+  --dolly-text: #e5e5e5;
+  --dolly-text-muted: #a1a1aa;
+  --dolly-text-dim: #71717a;
+  --dolly-tick: #2f2f36;
+  --dolly-hover: rgba(255, 255, 255, 0.06);
+  --dolly-hover-strong: rgba(255, 255, 255, 0.1);
+
+  /* --dolly-accent-2 is the far stop of the focus-region bar's gradient, the
+     only gradient in the UI. */
+  --dolly-accent: #7d6aff;
+  --dolly-accent-2: #6366f1;
+  /* Cursor track — a separate hue so the tracks read apart. */
+  --dolly-cursor: #22b8cf;
+  --dolly-cursor-glow: rgba(34, 184, 207, 0.14);
+  /* Script keyframes — a third hue, warm against the two cool tracks. */
+  --dolly-js: #f0a13a;
+  --dolly-js-glow: rgba(240, 161, 58, 0.14);
+  --dolly-selected: #c4b5fd;
+  --dolly-accent-glow: rgba(125, 106, 255, 0.14);
+  --dolly-accent-glow-strong: rgba(125, 106, 255, 0.2);
+
+  /* The play button, the one control inverted against everything else. */
+  --dolly-solid: #ffffff;
+  --dolly-solid-hover: #f1f1f4;
+
+  --dolly-transition-fill: rgba(34, 197, 94, 0.1);
+  --dolly-transition-text: #86efac;
+  --dolly-transition-time: #bbf7d0;
+
+  /* Failure states: a headline, softer body text, and a surface to sit on. */
+  --dolly-danger: #f87171;
+  --dolly-danger-text: #fca5a5;
+  --dolly-danger-surface: #221718;
+  --dolly-danger-border: #4c1d1d;
+
+  --dolly-font:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    sans-serif;
+  --dolly-font-mono: ui-monospace, monospace;
+
+  --dolly-track-height: 52px;
+  --dolly-track-gap: 8px;
+  --dolly-radius: 6px;
+}

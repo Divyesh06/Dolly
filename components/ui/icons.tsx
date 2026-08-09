@@ -1,0 +1,100 @@
+import type { ComponentChildren } from 'preact';
+
+/**
+ * The handful of Lucide icons Dolly uses, copied verbatim rather than pulling in
+ * the package. Lucide is ISC-licensed. Icons are 24×24 on a 2px stroke; keep the
+ * originals' geometry when adding more.
+ */
+
+export type IconProps = {
+  size?: number;
+  strokeWidth?: number;
+  class?: string;
+};
+
+function Glyph({
+  size = 16,
+  strokeWidth = 2,
+  class: className,
+  children,
+}: IconProps & { children: ComponentChildren }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width={strokeWidth}
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class={className}
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** lucide `play`, filled — an outline triangle reads poorly at button sizes. */
+export function PlayIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <polygon points="6 3 20 12 6 21 6 3" fill="currentColor" />
+    </Glyph>
+  );
+}
+
+/** lucide `square`, filled — the stop counterpart to play. */
+export function StopIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor" />
+    </Glyph>
+  );
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Glyph>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </Glyph>
+  );
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M5 12h14" />
+    </Glyph>
+  );
+}
+
+export function UndoIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11" />
+    </Glyph>
+  );
+}
+
+export function RedoIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="m15 14 5-5-5-5" />
+      <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13" />
+    </Glyph>
+  );
+}

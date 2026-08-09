@@ -1,0 +1,794 @@
+/* The palette lives in `components/ui/theme.css`, imported by the entrypoint. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dolly-bg-deep);
+  color: var(--dolly-text);
+  font-family: var(--dolly-font);
+}
+
+#app,
+.dolly-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── App header — size left, play centre, export right ───────────────────── */
+.dolly-app-header {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  /* Sized to the tallest control in it, the ~41px export button, plus padding. */
+  height: 66px;
+  padding: 0 20px;
+  background: var(--dolly-bg);
+  border-bottom: 1px solid var(--dolly-divider);
+}
+.dolly-app-header__left {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dolly-app-header__transport {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+}
+.dolly-export-picker {
+  justify-self: end;
+  position: relative;
+}
+
+.dolly-history {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dolly-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  color: var(--dolly-text-muted);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 100ms ease,
+    color 100ms ease;
+}
+.dolly-icon-button:hover:not(:disabled) {
+  background: var(--dolly-surface-hover);
+  color: var(--dolly-text);
+}
+.dolly-icon-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.dolly-app-header__status {
+  color: var(--dolly-text-dim);
+  font-size: 11px;
+}
+
+.dolly-app-header__mode {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--dolly-surface-hover);
+  color: var(--dolly-text-muted);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  cursor: help;
+}
+
+/* ── Play / stop ─────────────────────────────────────────────────────────── */
+.dolly-play {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--dolly-divider);
+  border-radius: 50%;
+  background: var(--dolly-solid);
+  color: var(--dolly-bg-deep);
+  cursor: pointer;
+  transition:
+    transform 100ms ease,
+    background 120ms ease,
+    opacity 120ms ease;
+}
+.dolly-play:hover:not(:disabled) {
+  background: var(--dolly-solid-hover);
+  transform: scale(1.04);
+}
+.dolly-play:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.dolly-play:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+/* Nudge the play triangle: a centred glyph reads as slightly left-of-centre. */
+.dolly-play:not(.dolly-play--playing) svg {
+  margin-left: 2px;
+}
+
+.dolly-app-header__export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--dolly-accent);
+  color: white;
+  border: none;
+  border-radius: 9px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+.dolly-app-header__export:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.dolly-app-header__export:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.dolly-app-header__export-chev {
+  opacity: 0.8;
+}
+
+.dolly-export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 260px;
+  background: var(--dolly-surface);
+  border: 1px solid var(--dolly-divider);
+  border-radius: 8px;
+  padding: 12px;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dolly-export-menu__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dolly-export-menu__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dolly-text-dim);
+}
+.dolly-export-menu__chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.dolly-export-menu__chip {
+  background: transparent;
+  color: var(--dolly-text-muted);
+  border: 1px solid var(--dolly-divider);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 100ms ease,
+    color 100ms ease,
+    border-color 100ms ease;
+}
+.dolly-export-menu__chip:hover {
+  background: var(--dolly-hover);
+  color: var(--dolly-text);
+}
+.dolly-export-menu__chip.is-active {
+  background: var(--dolly-accent);
+  color: white;
+  border-color: var(--dolly-accent);
+}
+.dolly-export-menu__go {
+  margin-top: 4px;
+  background: var(--dolly-accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.dolly-export-menu__go:hover {
+  filter: brightness(1.1);
+}
+
+.dolly-aspect-picker {
+  position: relative;
+}
+.dolly-aspect-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--dolly-surface);
+  color: var(--dolly-text);
+  border: 1px solid var(--dolly-divider);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 100ms ease,
+    border-color 100ms ease;
+}
+.dolly-aspect-picker__trigger:hover {
+  background: var(--dolly-surface-hover);
+}
+.dolly-aspect-picker__trigger-name {
+  font-weight: 500;
+}
+.dolly-aspect-picker__trigger-ratio {
+  color: var(--dolly-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.dolly-aspect-picker__chev {
+  color: var(--dolly-text-dim);
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+.dolly-aspect-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  /* Left-aligned: the picker sits at the far left of the header, so a centred
+     menu hangs off the window edge. */
+  left: 0;
+  min-width: 240px;
+  background: var(--dolly-surface);
+  border: 1px solid var(--dolly-divider);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.dolly-aspect-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  color: var(--dolly-text);
+  border: none;
+  border-radius: 4px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.dolly-aspect-menu__item:hover {
+  background: var(--dolly-hover);
+}
+.dolly-aspect-menu__item.is-active {
+  background: var(--dolly-accent-glow);
+  color: var(--dolly-selected);
+}
+.dolly-aspect-menu__name {
+  font-weight: 500;
+}
+.dolly-aspect-menu__ratio {
+  color: var(--dolly-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+.dolly-aspect-menu__divider {
+  height: 1px;
+  background: var(--dolly-divider);
+  margin: 4px 0;
+}
+.dolly-aspect-menu__custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  gap: 8px;
+}
+
+.dolly-aspect-custom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dolly-aspect-custom__input {
+  width: 44px;
+  background: var(--dolly-bg);
+  border: 1px solid var(--dolly-divider);
+  color: var(--dolly-text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.dolly-aspect-custom__input::-webkit-outer-spin-button,
+.dolly-aspect-custom__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.dolly-aspect-custom__input:focus {
+  outline: none;
+  border-color: var(--dolly-accent);
+}
+.dolly-aspect-custom__sep {
+  color: var(--dolly-text-dim);
+  font-size: 11px;
+}
+
+.dolly-timeline {
+  font-family: var(--dolly-font);
+  box-sizing: border-box;
+}
+
+.dolly-timeline * {
+  box-sizing: border-box;
+}
+
+/* ── Timeline — fills the controller window below the header ──────────────── */
+.dolly-timeline {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--dolly-bg);
+  color: var(--dolly-text);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dolly-timeline--locked {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.dolly-timeline--scrubbing,
+.dolly-timeline--scrubbing * {
+  cursor: col-resize !important;
+}
+
+.dolly-timeline__zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--dolly-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  background: var(--dolly-surface);
+  border: 1px solid var(--dolly-divider);
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.dolly-timeline__zoom button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+}
+.dolly-timeline__zoom button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.dolly-timeline button {
+  background: transparent;
+  color: var(--dolly-text);
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.dolly-timeline button:hover {
+  background: var(--dolly-hover);
+}
+.dolly-timeline__zoom button:hover {
+  background: var(--dolly-surface-hover);
+}
+
+.dolly-timeline__zoom-value {
+  min-width: 36px;
+  text-align: center;
+  color: var(--dolly-text);
+}
+
+.dolly-timeline__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+
+/* Scrolls on both axes: a short window must not clip the last track away. */
+.dolly-timeline__scroll {
+  flex: 1;
+  padding: 0 15px 12px;
+  overflow: auto;
+}
+.dolly-timeline__scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.dolly-timeline__scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dolly-timeline__scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.dolly-timeline__scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* `min-height`, not `height`: a fixed 100% pins content to the scroll viewport,
+   clipping tracks past the bottom edge with nothing to scroll to. */
+.dolly-timeline__content {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.dolly-timeline__ruler {
+  height: 22px;
+  position: relative;
+  margin-bottom: 20px;
+  user-select: none;
+}
+.dolly-timeline__tick {
+  position: absolute;
+  top: 4px;
+  bottom: 0;
+  border-left: 1px solid var(--dolly-tick);
+  padding-left: 5px;
+  user-select: none;
+}
+.dolly-timeline__tick-label {
+  font-size: 10px;
+  color: var(--dolly-text-dim);
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dolly-timeline__track {
+  position: relative;
+  height: var(--dolly-track-height);
+  background: var(--dolly-surface);
+  border-radius: var(--dolly-radius);
+  overflow: hidden;
+}
+.dolly-timeline__track + .dolly-timeline__track {
+  margin-top: var(--dolly-track-gap);
+}
+
+.dolly-region {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 0 !important;
+  cursor: grab;
+  background: linear-gradient(
+    135deg,
+    var(--dolly-accent) 0%,
+    var(--dolly-accent-2) 100%
+  );
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  user-select: none;
+  transition:
+    outline-color 120ms ease,
+    filter 120ms ease;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+.dolly-region--narrow {
+  padding: 0;
+  border-radius: 4px;
+}
+.dolly-region:hover {
+  filter: brightness(1.08);
+}
+.dolly-region--dragging {
+  cursor: grabbing;
+  filter: brightness(1.12);
+  z-index: 3;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  /* No transition: this one is following the cursor. */
+  transition: none;
+}
+
+.dolly-region--selected {
+  outline-color: var(--dolly-selected);
+}
+
+/* Cursor bars: flat and a distinct hue, so the tracks read apart. */
+.dolly-region--cursor {
+  background: var(--dolly-cursor);
+}
+
+/* The bar a drag is leaning into. Must stay after --selected: a selected bar can
+   also be a swap target, and this transient signal should win. */
+.dolly-region--swap-target {
+  outline-color: var(--dolly-selected);
+  outline-style: dashed;
+  filter: brightness(0.82) saturate(0.7);
+}
+
+.dolly-region__label {
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.dolly-region__time {
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1px 7px;
+  border-radius: 999px;
+  align-self: flex-start;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.dolly-region__edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+.dolly-region__edge--start {
+  left: 0;
+}
+.dolly-region__edge--end {
+  right: 0;
+}
+.dolly-region__edge:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dolly-transition {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 0 !important;
+  background: var(--dolly-transition-fill);
+  padding: 6px 10px;
+  color: var(--dolly-transition-text);
+  display: flex;
+  border-radius: 8px;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.dolly-transition--narrow {
+  padding: 0;
+  border-radius: 4px;
+}
+.dolly-transition__label {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dolly-transition__time {
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1px 7px;
+  border-radius: 999px;
+  align-self: flex-start;
+  font-variant-numeric: tabular-nums;
+  color: var(--dolly-transition-time);
+}
+
+/* JS keyframes: instants, so diamonds rather than bars. */
+.dolly-keyframe {
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 2;
+}
+.dolly-keyframe__shape {
+  position: absolute;
+  left: -9px;
+  top: -9px;
+  width: 18px;
+  height: 18px;
+  background: var(--dolly-js);
+  border: 1.5px solid rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  transform: rotate(45deg);
+  cursor: pointer;
+  transition:
+    transform 100ms ease,
+    box-shadow 120ms ease;
+}
+.dolly-keyframe:hover .dolly-keyframe__shape {
+  transform: rotate(45deg) scale(1.12);
+}
+.dolly-keyframe--selected .dolly-keyframe__shape {
+  border-color: var(--dolly-selected);
+  box-shadow: 0 0 0 2px var(--dolly-accent-glow-strong);
+}
+.dolly-keyframe--dragging .dolly-keyframe__shape {
+  cursor: grabbing;
+  transform: rotate(45deg) scale(1.16);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: none;
+}
+
+/* Hover popovers. The anchor is `display: contents` so it takes no space; the
+   bubble is fixed so the timeline's scroll container can't clip it. */
+.dolly-hint-anchor {
+  display: contents;
+}
+
+.dolly-hint {
+  position: fixed;
+  z-index: 200;
+  transform: translate(-50%, -100%);
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--dolly-bg-deep);
+  border: 1px solid var(--dolly-divider);
+  color: var(--dolly-text);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Alignment guide, drawn while a drag is latched onto a time on any track. */
+.dolly-snap-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--dolly-selected);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.dolly-add-region {
+  position: absolute !important;
+  top: 0;
+  height: 100% !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  border: 1px dashed rgba(255, 255, 255, 0.18) !important;
+  background: transparent !important;
+  color: var(--dolly-text-muted) !important;
+  font-size: 11px !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease !important;
+}
+.dolly-add-region:hover {
+  color: var(--dolly-text) !important;
+  border-color: var(--dolly-accent) !important;
+  background: var(--dolly-accent-glow) !important;
+}
+.dolly-add-region--cursor:hover {
+  border-color: var(--dolly-cursor) !important;
+  background: var(--dolly-cursor-glow) !important;
+}
+.dolly-add-region--js:hover {
+  border-color: var(--dolly-js) !important;
+  background: var(--dolly-js-glow) !important;
+}
+.dolly-add-region__icon {
+  flex-shrink: 0;
+}
+.dolly-add-region__text {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.dolly-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--dolly-accent);
+  pointer-events: none;
+  z-index: 3;
+  transform: translateX(-1px);
+}
+.dolly-playhead__head {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background: var(--dolly-accent);
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+  transform: translateX(-50%);
+}
+
+.dolly-ghost-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(196, 181, 253, 0.4);
+  pointer-events: none;
+  z-index: 2;
+  transform: translateX(-0.5px);
+}
+.dolly-ghost-playhead__time {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  background: rgba(196, 181, 253, 0.9);
+  color: var(--dolly-bg);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+

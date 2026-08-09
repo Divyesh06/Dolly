@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="500"
+   viewBox="0 0 500 499.99999"
+   role="img"
+   version="1.1"
+   id="svg16"
+   sodipodi:docname="logo.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   height="500"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs16" />
+  <sodipodi:namedview
+     id="namedview16"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.61136364"
+     inkscape:cx="214.27509"
+     inkscape:cy="259.2565"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg16" />
+  <title
+     id="title1">Dolly logo concepts, set two</title>
+  <desc
+     id="desc1">Six additional logo marks for Dolly.</desc>
+  <metadata
+     id="metadata16">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>Dolly logo concepts, set two</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <rect
+     style="fill:#151519;fill-opacity:1;stroke:#ffffff;stroke-width:0;stroke-dasharray:none;stroke-linejoin:bevel"
+     id="rect1"
+     width="500"
+     height="500"
+     x="0"
+     y="0" />
+  <g
+     style="color:#0b0b0b;font-weight:400;font-size:16px;font-family:anthropic-sans, '-apple-system', BlinkMacSystemFont, 'Segoe UI', sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:#000000;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"
+     id="g10"
+     transform="matrix(4.3478261,0,0,4.3478261,-328.26087,-1227.8261)">
+    <path
+       d="m 96,358 q 37,-90 74,0"
+       fill="none"
+       stroke="#1A1A1A"
+       stroke-width="6"
+       stroke-linecap="round"
+       style="color:#0b0b0b;font-weight:400;font-size:16px;font-family:anthropic-sans, '-apple-system', BlinkMacSystemFont, 'Segoe UI', sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:none;stroke:#ffffff;stroke-width:6px;stroke-linecap:round;stroke-linejoin:miter;stroke-opacity:1"
+       id="path8" />
+    <path
+       style="fill:#12350a;stroke:#ffffff;stroke-width:6;stroke-dasharray:none;stroke-opacity:1"
+       d="m 97.32342,359.03346 h 71.15242"
+       id="path16" />
+    <circle
+       cx="96"
+       cy="358"
+       r="9"
+       fill="#FF4D2E"
+       style="color:#0b0b0b;font-weight:400;font-size:16px;font-family:anthropic-sans, '-apple-system', BlinkMacSystemFont, 'Segoe UI', sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:#7d6aff;fill-opacity:1;stroke:none;stroke-width:1.00002;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none"
+       id="circle8" />
+    <circle
+       cx="170"
+       cy="358"
+       fill="#FF4D2E"
+       style="color:#0b0b0b;font-weight:400;font-size:16px;font-family:anthropic-sans, '-apple-system', BlinkMacSystemFont, 'Segoe UI', sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:#7d6aff;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"
+       id="circle9"
+       r="9" />
+  </g>
+</svg>

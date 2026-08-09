@@ -1,0 +1,119 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dolly-bg);
+  color: var(--dolly-text);
+  font-family: var(--dolly-font);
+  user-select: none;
+}
+
+#app,
+.dolly-curtain {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.dolly-curtain__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.dolly-curtain__percent {
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dolly-curtain__track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dolly-hover-strong);
+  overflow: hidden;
+}
+
+.dolly-curtain__fill {
+  height: 100%;
+  background: var(--dolly-accent);
+  border-radius: 999px;
+  transition: width 120ms linear;
+}
+
+.dolly-curtain__detail {
+  color: var(--dolly-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dolly-curtain__headline {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.dolly-curtain__headline--failed {
+  color: var(--dolly-danger);
+}
+
+.dolly-curtain__summary {
+  margin: 0;
+  width: 100%;
+  max-height: 220px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--dolly-surface);
+  border: 1px solid var(--dolly-divider);
+  color: var(--dolly-text-muted);
+  font-family: var(--dolly-font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+/* An error message reads as body text, not as stats. */
+.dolly-curtain__summary--failed {
+  color: var(--dolly-danger-text);
+  border-color: var(--dolly-danger-border);
+  background: var(--dolly-danger-surface);
+}
+
+.dolly-curtain__button {
+  padding: 9px 18px;
+  border: 1px solid var(--dolly-divider);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dolly-text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.dolly-curtain__button:hover {
+  background: var(--dolly-hover);
+}
+
+.dolly-curtain__note {
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 0 24px;
+  color: var(--dolly-text-dim);
+  font-size: 11px;
+}
