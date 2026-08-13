@@ -41,7 +41,6 @@ export default defineContentScript({
       transformOrigin: string;
       willChange: string;
       overflow: string;
-      scrollbarGutter: string;
       /** Frozen at session start, so a shot stays consistent. */
       scrollX: number;
       scrollY: number;
@@ -59,15 +58,15 @@ export default defineContentScript({
         transformOrigin: root.style.transformOrigin,
         willChange: root.style.willChange,
         overflow: root.style.overflow,
-        scrollbarGutter: root.style.getPropertyValue('scrollbar-gutter'),
         scrollX: window.scrollX,
         scrollY: window.scrollY,
       };
       // Scaling the root manufactures viewport overflow, whose scrollbars would
-      // reflow the page mid-shot. The gutter stays reserved so a page that had
-      // one keeps its content width.
+      // reflow the page mid-shot. The gutter is deliberately *not* reserved:
+      // holding the scrollbar's width open leaves a bare strip down the right
+      // edge of every captured frame. Letting the content reflow into that
+      // width instead costs a one-off shift as the take starts.
       root.style.overflow = 'hidden';
-      root.style.setProperty('scrollbar-gutter', 'stable');
       // Never hint `will-change: transform`: it pins the layer's raster scale,
       // which is the blur the camera is trying to avoid.
       root.style.willChange = 'auto';
@@ -79,11 +78,6 @@ export default defineContentScript({
       root.style.transformOrigin = saved.transformOrigin;
       root.style.willChange = saved.willChange;
       root.style.overflow = saved.overflow;
-      if (saved.scrollbarGutter) {
-        root.style.setProperty('scrollbar-gutter', saved.scrollbarGutter);
-      } else {
-        root.style.removeProperty('scrollbar-gutter');
-      }
       saved = null;
     };
 

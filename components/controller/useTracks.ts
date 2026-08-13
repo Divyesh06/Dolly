@@ -241,6 +241,27 @@ export function useTracks({ frame, measureViewport }: UseTracksArgs) {
     [remember],
   );
 
+  /**
+   * Show or hide an effect in the page. Editor-only: the shot is unchanged, so
+   * a hidden region still moves the camera and a hidden cursor still records.
+   *
+   * Not `update`, which coalesces for drags — a toggle is one discrete step.
+   */
+  const toggleHidden = useCallback(
+    (id: string) => {
+      remember(false);
+      const flip = <T extends { id: string; hidden?: boolean }>(prev: T[]) =>
+        prev.some((item) => item.id === id)
+          ? prev.map((item) =>
+              item.id === id ? { ...item, hidden: !item.hidden } : item,
+            )
+          : prev;
+      setRegions(flip);
+      setCursors(flip);
+    },
+    [remember],
+  );
+
   // ── clipboard ────────────────────────────────────────────────────────────
 
   const deleteSelected = useCallback(() => {
@@ -487,6 +508,7 @@ export function useTracks({ frame, measureViewport }: UseTracksArgs) {
     addScript,
     moveScript,
     setScriptCode,
+    toggleHidden,
     execute,
     applyPatch,
     remapTracks,

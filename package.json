@@ -2,7 +2,7 @@
   "name": "dolly",
   "description": "Cinematic product demos in the browser",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

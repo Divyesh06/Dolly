@@ -489,6 +489,7 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
     swapCursor: tracks.swapCursor,
     addScript: tracks.addScript,
     moveScript: tracks.moveScript,
+    toggleHidden: tracks.toggleHidden,
     openScriptEditor,
     play: playback.play,
     stop: playback.stop,

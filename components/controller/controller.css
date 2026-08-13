@@ -581,6 +581,42 @@ body {
   pointer-events: none;
 }
 
+/* Hidden in the page, but still part of the shot — dimmed rather than struck
+   through, so it stays readable as a clip you can retime. */
+.dolly-region--hidden {
+  filter: saturate(0.25) brightness(0.75);
+}
+
+.dolly-region__eye {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.28);
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
+  z-index: 2;
+}
+/* Revealed on hover, or kept up whenever it is doing something. */
+.dolly-region:hover .dolly-region__eye,
+.dolly-region__eye:focus-visible,
+.dolly-region--hidden .dolly-region__eye {
+  opacity: 1;
+}
+.dolly-region__eye:hover {
+  background: rgba(0, 0, 0, 0.45);
+}
+
 .dolly-region__edge {
   position: absolute;
   top: 0;

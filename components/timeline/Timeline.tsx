@@ -21,6 +21,8 @@ type Props = {
   onUpdateCursor: (id: string, patch: Partial<CursorPoint>) => void;
   onMoveCursor: (id: string, startTime: number) => void;
   onSwapCursor: (id: string, direction: -1 | 1) => void;
+  /** Show or hide a region or cursor in the page. Editor-only. */
+  onToggleHidden: (id: string) => void;
   scripts: JsKeyframe[];
   onAddScript: () => void;
   onMoveScript: (id: string, time: number) => void;
@@ -51,6 +53,7 @@ export function Timeline({
   onUpdateCursor,
   onMoveCursor,
   onSwapCursor,
+  onToggleHidden,
   scripts,
   onAddScript,
   onMoveScript,
@@ -187,6 +190,8 @@ export function Timeline({
                   selected={region.id === selectedId}
                   swapTarget={region.id === swapTargetId}
                   label="Focus Region"
+                  hidden={region.hidden}
+                  onToggleHidden={() => onToggleHidden(region.id)}
                   onClick={() => onSelect(region.id)}
                   onResize={(patch) => onUpdateRegion(region.id, patch)}
                   onMove={(start) => onMoveRegion(region.id, start)}
@@ -225,6 +230,8 @@ export function Timeline({
                   swapTarget={cursor.id === swapTargetId}
                   label="Cursor"
                   modifier="dolly-region--cursor"
+                  hidden={cursor.hidden}
+                  onToggleHidden={() => onToggleHidden(cursor.id)}
                   onClick={() => onSelect(cursor.id)}
                   onResize={(patch) => onUpdateCursor(cursor.id, patch)}
                   onMove={(start) => onMoveCursor(cursor.id, start)}

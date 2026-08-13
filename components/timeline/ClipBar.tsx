@@ -1,4 +1,5 @@
 import { useRef, useState } from 'preact/hooks';
+import { EyeIcon, EyeOffIcon } from '@/components/ui/icons';
 import { trackDrag } from '@/lib/drag';
 import { snapToNearest } from '@/lib/snapping';
 import {
@@ -27,6 +28,9 @@ export type ClipBarProps<T extends TimeSpan> = {
   label: string;
   /** Extra class for per-kind styling, e.g. `dolly-region--cursor`. */
   modifier?: string;
+  /** Drawn in the page, or hidden there while you work on what it overlaps. */
+  hidden?: boolean;
+  onToggleHidden: () => void;
   onClick: () => void;
   onResize: (patch: { startTime?: number; endTime?: number }) => void;
   onMove: (startTime: number) => void;
@@ -49,6 +53,8 @@ export function ClipBar<T extends TimeSpan>({
   swapTarget,
   label,
   modifier = '',
+  hidden = false,
+  onToggleHidden,
   onClick,
   onResize,
   onMove,
@@ -202,7 +208,9 @@ export function ClipBar<T extends TimeSpan>({
         selected ? 'dolly-region--selected' : ''
       } ${isNarrow ? 'dolly-region--narrow' : ''} ${
         dragging ? 'dolly-region--dragging' : ''
-      } ${swapTarget ? 'dolly-region--swap-target' : ''}`}
+      } ${swapTarget ? 'dolly-region--swap-target' : ''} ${
+        hidden ? 'dolly-region--hidden' : ''
+      }`}
       style={{
         left: span.startTime * pxPerSec,
         width: widthPx,
@@ -219,6 +227,20 @@ export function ClipBar<T extends TimeSpan>({
         <>
           <div class="dolly-region__label">{label}</div>
           <div class="dolly-region__time">{formatTime(duration)}</div>
+          {/* `data-handle` keeps the body drag off it, as for the edges. */}
+          <button
+            data-handle="eye"
+            class="dolly-region__eye"
+            title={hidden ? 'Show in the page' : 'Hide in the page'}
+            aria-label={hidden ? 'Show in the page' : 'Hide in the page'}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleHidden();
+            }}
+          >
+            {hidden ? <EyeOffIcon size={13} /> : <EyeIcon size={13} />}
+          </button>
         </>
       )}
       <div

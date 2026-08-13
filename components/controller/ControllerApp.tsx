@@ -332,6 +332,7 @@ export function ControllerApp() {
         onUpdateCursor={controller.updateCursor}
         onMoveCursor={controller.moveCursor}
         onSwapCursor={controller.swapCursor}
+        onToggleHidden={controller.toggleHidden}
         scripts={controller.scripts}
         onAddScript={controller.addScript}
         onMoveScript={controller.moveScript}

@@ -10,15 +10,26 @@ import {
   type FocusRegion,
 } from '@/lib/effects';
 
+/** Where a region may go, in document coordinates. */
+export type RegionLimit = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
 type Props = {
   region: FocusRegion;
   selected: boolean;
   /** The frame's size — sets the region's aspect ratio and its maximum size. */
   frameWidth: number;
   frameHeight: number;
-  /** Drag limit. Regions are in document coordinates, so this is the document's extent. */
-  boundsWidth: number;
-  boundsHeight: number;
+  /**
+   * Drag and resize limit: the visible viewport. A region outside it would
+   * extend the page's scrollable area, which puts a scrollbar on the recorded
+   * page and reflows it.
+   */
+  limit: RegionLimit;
   onSelect: () => void;
   onChange: (patch: Partial<FocusRegion>) => void;
   /** Lines the edges and centre can align to, in document coordinates. */
@@ -30,14 +41,16 @@ type Props = {
 
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
 
+/** `hi` below `lo` means the region is wider than the limit; `lo` wins. */
+const clamp = (value: number, lo: number, hi: number) =>
+  Math.min(Math.max(value, lo), Math.max(lo, hi));
 
 export function FocusRegionRect({
   region,
   selected,
   frameWidth,
   frameHeight,
-  boundsWidth,
-  boundsHeight,
+  limit,
   onSelect,
   onChange,
   snapTargets,
@@ -67,8 +80,8 @@ export function FocusRegionRect({
       const snapped = { x: result.x, y: result.y };
       onGuides?.(result.lines);
       onChange({
-        x: Math.max(0, Math.min(boundsWidth - region.width, snapped.x)),
-        y: Math.max(0, Math.min(boundsHeight - region.height, snapped.y)),
+        x: clamp(snapped.x, limit.left, limit.right - region.width),
+        y: clamp(snapped.y, limit.top, limit.bottom - region.height),
       });
     };
     trackDrag(e, onMove, () => onDragEnd?.());
@@ -122,20 +135,26 @@ export function FocusRegionRect({
       let width = best ? best.width : rawWidth;
       onGuides?.(best ? [best.line] : []);
 
-      width = Math.max(MIN_REGION_WIDTH, Math.min(frameWidth, width));
+      // Never larger than the frame, and never larger than what is actually on
+      // screen — the two differ while the page window is still being fitted.
+      const maxWidth = Math.min(frameWidth, limit.right - limit.left);
+      const maxHeight = Math.min(frameHeight, limit.bottom - limit.top);
+      width = Math.max(MIN_REGION_WIDTH, Math.min(maxWidth, width));
       let height = width / frameAspect;
-      if (height > frameHeight) {
-        height = frameHeight;
+      if (height > maxHeight) {
+        height = maxHeight;
         width = height * frameAspect;
       }
 
-      const newX = Math.max(
-        0,
-        Math.min(boundsWidth - width, west ? anchorX - width : anchorX),
+      const newX = clamp(
+        west ? anchorX - width : anchorX,
+        limit.left,
+        limit.right - width,
       );
-      const newY = Math.max(
-        0,
-        Math.min(boundsHeight - height, north ? anchorY - height : anchorY),
+      const newY = clamp(
+        north ? anchorY - height : anchorY,
+        limit.top,
+        limit.bottom - height,
       );
       onChange({ x: newX, y: newY, width, height });
     };

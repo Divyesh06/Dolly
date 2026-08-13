@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dolly — demo stage</title>
+
+  <!--
+      A stage for recording Dolly's own product demo. Every panel is 16/9, so a
+      focus region drawn on one fills the frame exactly, and the whole layout
+      fits a single viewport — focus regions clamp to what is on screen.
+
+        #sec-focus   camera            (CSS animation, runs on its own)
+        #sec-crisp   crispness         (CSS animation, runs on its own)
+        #sec-export  4K 60fps          (CSS animation, runs on its own)
+        #brand       the Dolly mark    — the closing shot
+
+      Script keyframes:
+
+        // typing
+        Dolly.type('#search', 'wireless headphones', 1400)
+        Dolly.type('#search', 'noise cancelling', 1200, { clear: true })
+
+        // Keyframe A — before the camera reaches the card: clear the row.
+        // rubberBand and tada only animate transform, so fill-mode cannot
+        // hide them the way it hides the …In effects. They have to be hidden
+        // by hand, or they sit there visible while the others play.
+        [
+          '#fx-bounceIn', '#fx-flipInX', '#fx-zoomIn',
+          '#fx-fadeInUp', '#fx-rubberBand', '#fx-tada',
+        ].forEach((sel) => {
+          const el = document.querySelector(sel);
+          el.style.transition = 'opacity 200ms ease';
+          el.style.opacity = '0';
+        });
+
+        // Keyframe B — camera on the card: each chip appears as its effect
+        // plays. setTimeout is the page's, so the export steps it on video
+        // time rather than wall time.
+        [
+          ['#fx-bounceIn',   'bounceIn',   700],
+          ['#fx-flipInX',    'flipInX',    700],
+          ['#fx-zoomIn',     'zoomIn',     700],
+          ['#fx-fadeInUp',   'fadeInUp',   700],
+          ['#fx-rubberBand', 'rubberBand', 900],
+          ['#fx-tada',       'tada',       900],
+        ].forEach(([sel, effect, ms], i) => {
+          setTimeout(() => {
+            const el = document.querySelector(sel);
+            el.style.opacity = '1';
+            Dolly.animate(el, effect, ms);
+          }, i * 300);
+        });
+
+        // the dialog
+        document.getElementById('dialog').classList.add('is-open')
+        document.getElementById('dialog').classList.remove('is-open')
+
+      That panel is deliberately not a <dialog>: a modal dialog is centred in
+      the layout viewport, so with the camera zoomed into a card it would open
+      off frame. This one opens inside the card.
+    -->
+
+  <style>
+    :root {
+      --bg: #16161a;
+      --bg-deep: #0a0a0d;
+      --divider: #2a2a30;
+      --text: #e5e5e5;
+      --muted: #a1a1aa;
+      --dim: #71717a;
+      --accent: #7d6aff;
+      --cursor: #22b8cf;
+      --js: #f0a13a;
+      --green: #4ade80;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        'Helvetica Neue', sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1100px 620px at 50% -10%,
+          rgba(125, 106, 255, 0.13),
+          transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .stage {
+      min-height: 100vh;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-content: center;
+      justify-items: stretch;
+      gap: 16px;
+    }
+
+    /* ── panels ────────────────────────────────────────────────────────── */
+
+    /* 16/9, so a region drawn on one matches the exported frame exactly. */
+    .card {
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      padding: 15px 17px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--divider);
+      border-radius: 14px;
+      background: transparent;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: -0.012em;
+    }
+
+    .sub {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /*
+       * Fills whatever space the copy leaves and scales its own contents to
+       * fit, so no illustration can be clipped by a narrower window.
+       */
+    .art {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      margin-top: 8px;
+      display: block;
+    }
+
+    /* ── focus regions ─────────────────────────────────────────────────── */
+
+    .vf-frame {
+      fill: none;
+
+      stroke-width: 1;
+    }
+
+    .vf-bracket {
+      fill: none;
+      stroke: var(--dim);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+
+    .vf-target {
+      fill: rgba(125, 106, 255, 0.14);
+      stroke: var(--accent);
+      stroke-width: 1.6;
+    }
+
+    .vf-tick {
+      stroke: var(--accent);
+      stroke-width: 1.4;
+      stroke-linecap: round;
+    }
+
+    /* The reticle closing in and opening out: the camera move, in miniature. */
+    .vf-zoom {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: reticle 3.4s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+    }
+
+    @keyframes reticle {
+
+      0%,
+      12% {
+        transform: scale(1) translate(0, 0);
+      }
+
+      44%,
+      60% {
+        transform: scale(0.46) translate(-30px, -8px);
+      }
+
+      92%,
+      100% {
+        transform: scale(1) translate(0, 0);
+      }
+    }
+
+    /* ── crispness: curves, gradients and hairline seams to judge ──────── */
+
+    .ball-seam {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.85);
+      stroke-width: 1.1;
+    }
+
+    .ball-rim {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.5);
+      stroke-width: 1.1;
+    }
+
+    .ball {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: bob 4.2s ease-in-out infinite;
+    }
+
+    @keyframes bob {
+
+      0%,
+      100% {
+        transform: translateY(0) rotate(-10deg);
+      }
+
+      50% {
+        transform: translateY(-6px) rotate(-4deg);
+      }
+    }
+
+    /* Tightens as the ball lifts, so it reads as resting on the ground. */
+    .ball-shadow {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: shadow-bob 4.2s ease-in-out infinite;
+    }
+
+    @keyframes shadow-bob {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(0.85);
+        opacity: 0.6;
+      }
+    }
+
+    /* ── 4K 60fps ──────────────────────────────────────────────────────── */
+
+    .rail {
+      stroke: var(--divider);
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    .sleeper {
+      stroke: rgba(42, 42, 48, 0.9);
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+
+    .cart-body {
+      fill: #26262c;
+      stroke: var(--dim);
+      stroke-width: 1.2;
+    }
+
+    .cart-cam {
+      fill: rgba(125, 106, 255, 0.18);
+      stroke: var(--accent);
+      stroke-width: 1.4;
+    }
+
+    .cart-lens {
+      fill: var(--bg-deep);
+      stroke: var(--accent);
+      stroke-width: 1.4;
+    }
+
+    .wheel {
+      fill: var(--bg-deep);
+      stroke: var(--accent);
+      stroke-width: 1.6;
+    }
+
+    .spoke {
+      stroke: var(--accent);
+      stroke-width: 1;
+      stroke-linecap: round;
+    }
+
+    /* transform, so it rides the compositor — the smoothness under test. */
+    .cart {
+      transform-box: fill-box;
+      animation: roll 5.4s cubic-bezier(0.4, 0, 0.4, 1) infinite alternate;
+    }
+
+    @keyframes roll {
+      from {
+        transform: translateX(0);
+      }
+
+      to {
+        transform: translateX(178px);
+      }
+    }
+
+    .wheel-group {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: spin 1.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── typewriter ────────────────────────────────────────────────────── */
+
+    /* No copy on this card: the field says what it is once text lands in it. */
+    .card--type {
+      justify-content: center;
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 13px 18px;
+      border: 1px solid var(--divider);
+      border-radius: 999px;
+      background: var(--bg-deep);
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .search:focus-within {
+      border-color: rgba(125, 106, 255, 0.6);
+      box-shadow: 0 0 0 3px rgba(125, 106, 255, 0.14);
+    }
+
+    .search svg {
+      flex: none;
+      color: var(--dim);
+    }
+
+    .search input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: none;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      /* Visible on camera, and the only cue the field is a field while empty. */
+      caret-color: var(--accent);
+    }
+
+    /* ── animation effects ─────────────────────────────────────────────── */
+
+    .chips {
+      margin-top: auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 10px 4px;
+      border: 1px solid var(--divider);
+      border-radius: 10px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .chip svg {
+      color: var(--accent);
+    }
+
+    .chip:nth-child(3n + 2) svg {
+      color: var(--cursor);
+    }
+
+    .chip:nth-child(3n) svg {
+      color: var(--js);
+    }
+
+    /* ── javascript keyframes ──────────────────────────────────────────── */
+
+    .code {
+      margin-top: auto;
+      padding: 11px 13px;
+      border: 1px solid var(--divider);
+      border-radius: 10px;
+      background: var(--bg-deep);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.65;
+      color: var(--muted);
+      overflow: hidden;
+    }
+
+    .code .k {
+      color: var(--js);
+    }
+
+    .code .s {
+      color: var(--green);
+    }
+
+    .code .c {
+      color: var(--dim);
+    }
+
+    .dialog {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(10, 10, 13, 0.76);
+      backdrop-filter: blur(2px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+
+    .dialog.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .dialog__panel {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 14px 18px;
+      border: 1px solid rgba(125, 106, 255, 0.4);
+      border-radius: 12px;
+      background: #1b1b21;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+      transform: translateY(6px) scale(0.97);
+      transition: transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+
+    .dialog.is-open .dialog__panel {
+      transform: translateY(0) scale(1);
+    }
+
+    .dialog__title {
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    /* ── the mark ──────────────────────────────────────────────────────── */
+
+    /*
+       * Its own full row, so nothing can auto-place beside it. Not a card: no
+       * border, no aspect-ratio of its own. Stacked and narrow instead, so its
+       * bounding box is already close to 16/9 — a region drawn round it crops
+       * nothing and wastes little.
+       */
+    /*
+     * Small, with generous room above and below. A 16/9 region is as tall as
+     * 9/16 of its width, so the narrower this group is the shorter that region
+     * needs to be — and the padding keeps the neighbouring cards' borders well
+     * outside it.
+     */
+    .brand {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 52px 0;
+    }
+
+    .brand__logo {
+      display: block;
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+    }
+
+    .brand__word {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1;
+      background: linear-gradient(100deg,
+          #ffffff 0%,
+          #ffffff 38%,
+          var(--accent) 62%,
+          #ffffff 86%);
+      background-size: 260% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: sheen 6s ease-in-out infinite;
+    }
+
+    @keyframes sheen {
+
+      0%,
+      100% {
+        background-position: 100% 0;
+      }
+
+      50% {
+        background-position: 0 0;
+      }
+    }
+
+    .brand__tag {
+      margin: 4px 0 0;
+      font-size: 10px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+  <main class="stage">
+    <!-- ── camera ──────────────────────────────────────────────────────── -->
+    <section class="card" id="sec-focus">
+      <h2>Focus on specific regions</h2>
+      <p class="sub">with smooth transitions</p>
+      <svg class="art" viewBox="0 0 220 104" aria-hidden="true">
+        <rect class="vf-frame" x="4" y="4" width="212" height="96" rx="7" />
+        <path class="vf-bracket" d="M16 32V18h13M204 32V18h-13M16 72v14h13M204 72v14h-13" />
+        <g class="vf-zoom">
+          <rect class="vf-target" x="74" y="32" width="72" height="40" rx="5" />
+          <path class="vf-tick" d="M110 36v-7M110 68v7M78 52h-7M142 52h7" />
+        </g>
+      </svg>
+    </section>
+
+    <!-- ── crispness ───────────────────────────────────────────────────── -->
+    <section class="card" id="sec-crisp">
+      <h2>Get crisp outputs</h2>
+      <p class="sub">even at 100× zoom</p>
+      <svg class="art" viewBox="0 0 220 104" aria-hidden="true">
+        <defs>
+          <radialGradient id="gloss" cx="34%" cy="26%" r="62%">
+            <stop offset="0%" stop-color="#fff" stop-opacity="0.65" />
+            <stop offset="42%" stop-color="#fff" stop-opacity="0.08" />
+            <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="shade" cx="42%" cy="36%" r="72%">
+            <stop offset="55%" stop-color="#000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000" stop-opacity="0.45" />
+          </radialGradient>
+          <radialGradient id="floor" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#000" stop-opacity="0.55" />
+            <stop offset="100%" stop-color="#000" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+
+        <!-- Ball spans y 16..88; the shadow sits right under it. -->
+        <ellipse class="ball-shadow" cx="110" cy="92" rx="40" ry="6" fill="url(#floor)" />
+
+        <!--
+            The placing translate and the animation must live on separate
+            groups: a CSS transform replaces an SVG transform attribute
+            outright, so animating this group directly would drop it back to
+            the origin.
+          -->
+        <g transform="translate(110 52)">
+          <g class="ball">
+            <!-- Four lunes, meridian to meridian: real curves to raster. -->
+            <path d="M0 -36A36 36 0 0 1 0 36A12 36 0 0 0 0 -36Z" fill="#ff5f6d" />
+            <path d="M0 -36A12 36 0 0 1 0 36L0 -36Z" fill="#ffd166" />
+            <path d="M0 -36L0 36A12 36 0 0 1 0 -36Z" fill="#4ade80" />
+            <path d="M0 -36A12 36 0 0 0 0 36A36 36 0 0 1 0 -36Z" fill="#38bdf8" />
+
+            <!-- Hairline seams, then gloss and shading over the top. -->
+            <path class="ball-seam" d="M0 -36A12 36 0 0 1 0 36" />
+            <path class="ball-seam" d="M0 -36A12 36 0 0 0 0 36" />
+            <path class="ball-seam" d="M0 -36L0 36" />
+            <circle r="36" fill="url(#shade)" />
+            <circle r="36" fill="url(#gloss)" />
+            <circle class="ball-rim" r="36" />
+            <ellipse cx="-12" cy="-18" rx="7" ry="4.6" fill="#fff" opacity="0.5" transform="rotate(-24 -12 -18)" />
+          </g>
+        </g>
+      </svg>
+    </section>
+
+    <!-- ── 4K 60fps ────────────────────────────────────────────────────── -->
+    <section class="card" id="sec-export">
+      <h2>Export at 4K 60fps</h2>
+      <p class="sub">regardless of your native resolution</p>
+      <svg class="art" viewBox="0 0 300 90" aria-hidden="true">
+        <g class="sleeper">
+          <line x1="14" y1="74" x2="14" y2="82" />
+          <line x1="55" y1="74" x2="55" y2="82" />
+          <line x1="96" y1="74" x2="96" y2="82" />
+          <line x1="137" y1="74" x2="137" y2="82" />
+          <line x1="178" y1="74" x2="178" y2="82" />
+          <line x1="219" y1="74" x2="219" y2="82" />
+          <line x1="260" y1="74" x2="260" y2="82" />
+        </g>
+        <path class="rail" d="M6 74h288" />
+        <g class="cart">
+          <rect class="cart-body" x="30" y="48" width="56" height="17" rx="4" />
+          <rect class="cart-cam" x="43" y="28" width="32" height="20" rx="4" />
+          <circle class="cart-lens" cx="75" cy="38" r="5.5" />
+          <g class="wheel-group">
+            <circle class="wheel" cx="42" cy="68" r="6.5" />
+            <path class="spoke" d="M42 62v12M36 68h12" />
+          </g>
+          <g class="wheel-group">
+            <circle class="wheel" cx="74" cy="68" r="6.5" />
+            <path class="spoke" d="M74 62v12M68 68h12" />
+          </g>
+        </g>
+      </svg>
+    </section>
+
+    <!-- ── the mark ────────────────────────────────────────────────────── -->
+    <div class="brand" id="brand">
+      <img class="brand__logo" src="logo.svg" alt="" />
+      <div>
+        <div class="brand__word">Dolly</div>
+        <p class="brand__tag">Cinematic product demos in the browser.</p>
+      </div>
+    </div>
+
+    <!-- ── typewriter ──────────────────────────────────────────────────── -->
+    <section class="card card--type" id="sec-type">
+      <div class="search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input id="search" type="text" />
+      </div>
+    </section>
+
+    <!-- ── animation effects ───────────────────────────────────────────── -->
+    <section class="card" id="sec-anim">
+      <h2>And animation effects</h2>
+      <p class="sub">on cue, anywhere on the page</p>
+      <div class="chips">
+        <div class="chip" id="fx-bounceIn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M12 3v6M12 21a6 6 0 1 0 0-12" />
+          </svg>
+          bounceIn
+        </div>
+        <div class="chip" id="fx-flipInX">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M3 12h18M7 7l-4 5 4 5M17 7l4 5-4 5" />
+          </svg>
+          flipInX
+        </div>
+        <div class="chip" id="fx-zoomIn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M11 8v6M8 11h6" />
+          </svg>
+          zoomIn
+        </div>
+        <div class="chip" id="fx-fadeInUp">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M12 20V6M6 12l6-6 6 6" />
+          </svg>
+          fadeInUp
+        </div>
+        <div class="chip" id="fx-rubberBand">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M4 12c4-7 12-7 16 0M4 12c4 7 12 7 16 0" />
+          </svg>
+          rubberBand
+        </div>
+        <div class="chip" id="fx-tada">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2" />
+          </svg>
+          tada
+        </div>
+      </div>
+    </section>
+
+    <!-- ── javascript keyframes ────────────────────────────────────────── -->
+    <section class="card" id="sec-js">
+      <h2>And JavaScript keyframes</h2>
+      <p class="sub">run code mid-shot</p>
+      <div class="code">
+        <span class="c">// at 4.0s</span><br />
+        <span class="k">document</span>.getElementById(<span class="s">'dialog'</span>)<br />
+        &nbsp;&nbsp;.classList.add(<span class="s">'is-open'</span>)
+      </div>
+
+      <div class="dialog" id="dialog">
+        <div class="dialog__panel">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7d6aff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="m9 8-4 4 4 4M15 8l4 4-4 4" />
+          </svg>
+          <div class="dialog__title">Triggered by a JS keyframe</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+
+</html>

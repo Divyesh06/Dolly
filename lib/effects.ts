@@ -11,6 +11,11 @@ export type FocusRegion = TimeSpan & {
   y: number;
   width: number;
   height: number;
+  /**
+   * Hidden from the editor only, for working on overlapping effects. The shot
+   * is unaffected: a hidden region still moves the camera.
+   */
+  hidden?: boolean;
 };
 
 /** Which glyph a cursor draws. Artwork and labels live in `cursorGlyphs.ts`. */
@@ -31,6 +36,8 @@ export type CursorPoint = TimeSpan & {
   /** Multiplier on CURSOR_BASE_SIZE. */
   scale: number;
   icon: CursorIcon;
+  /** Hides the editing handle only; the cursor still appears in the shot. */
+  hidden?: boolean;
 };
 
 /**

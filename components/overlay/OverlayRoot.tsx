@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'preact/hooks';
-import { FocusRegionRect } from './FocusRegionRect';
+import { FocusRegionRect, type RegionLimit } from './FocusRegionRect';
 import type { CursorPose } from '@/lib/cursor';
 import {
   RECT_SNAP_TOLERANCE,
@@ -56,11 +56,30 @@ export function OverlayRoot({
     y: window.scrollY + window.innerHeight / 2,
   });
 
-  /** Every other focus region, plus the on-screen centre. Scroll is read live. */
+  /**
+   * What is on screen right now, in document coordinates. `clientWidth` rather
+   * than `innerWidth`, so the limit excludes any scrollbar: a region placed
+   * under one would still overflow the page.
+   */
+  const regionLimit = (): RegionLimit => {
+    const view = document.documentElement;
+    return {
+      left: window.scrollX,
+      top: window.scrollY,
+      right: window.scrollX + view.clientWidth,
+      bottom: window.scrollY + view.clientHeight,
+    };
+  };
+
+  /**
+   * Every other visible focus region, plus the on-screen centre. Scroll is read
+   * live. Hidden regions are left out: nothing should latch onto an edge that
+   * isn't on screen.
+   */
   const targetsFor = useCallback(
     (id: string) => {
       const others: Rect[] = regions
-        .filter((r) => r.id !== id)
+        .filter((r) => r.id !== id && !r.hidden)
         .map(({ x, y, width, height }) => ({ x, y, width, height }));
       return rectSnapTargets(others, viewCenter());
     },
@@ -83,6 +102,11 @@ export function OverlayRoot({
   );
 
   const clearGuides = useCallback(() => setGuides([]), []);
+
+  // Editor-only: the shot still includes these. The live cursor sprite is drawn
+  // from the pose the controller sends, so hiding a handle never touches it.
+  const visibleRegions = regions.filter((region) => !region.hidden);
+  const visibleCursors = cursors.filter((cursor) => !cursor.hidden);
 
   return (
     <div>
@@ -109,15 +133,14 @@ export function OverlayRoot({
             }
           />
         ))}
-        {regions.map((region) => (
+        {visibleRegions.map((region) => (
           <FocusRegionRect
             key={region.id}
             region={region}
             selected={region.id === selectedId}
             frameWidth={frameWidth}
             frameHeight={frameHeight}
-            boundsWidth={boundsWidth}
-            boundsHeight={boundsHeight}
+            limit={regionLimit()}
             snapTargets={targetsFor(region.id)}
             onGuides={setGuides}
             onDragEnd={clearGuides}
@@ -125,7 +148,7 @@ export function OverlayRoot({
             onChange={(patch) => onChangeRegion(region.id, patch)}
           />
         ))}
-        {cursors.map((cursor) => (
+        {visibleCursors.map((cursor) => (
           <CursorHandle
             key={cursor.id}
             x={cursor.x}
