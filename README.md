@@ -179,8 +179,6 @@ The final video is encoded as H.264 in an MP4 and downloaded when the export fin
 
 If an export is cancelled or fails, Dolly doesn't create a partial video.
 
-**Close DevTools on the page you are recording.** Chrome only allows one debugger connection per tab, and Dolly needs that connection during export.
-
 ## Keyboard shortcuts
 
 These work in both the controller and the page.
