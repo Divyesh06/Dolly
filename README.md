@@ -47,7 +47,7 @@ Dolly is not on the Chrome Web Store yet, so it needs to be installed as an unpa
 
 1. Download the latest version from the [Releases page](https://github.com/Divyesh06/Dolly/releases).
 2. Unzip it somewhere you want to keep it. Chrome loads Dolly from this folder, so don't move or delete it afterwards.
-3. Open `chrome://extensions` and turn on **Developer mode** in the top right.
+3. Open `chrome://extensions` (or click on the puzzle icon on top and then manage extensions) and turn on **Developer mode** in the top right.
 4. Click **Load unpacked** and select the unzipped folder.
 
 To update Dolly, download the new release, replace the old folder's contents, and click the reload button on Dolly's card in `chrome://extensions`.
