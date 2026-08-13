@@ -246,7 +246,7 @@ lib/             camera, cursor and track maths, protocol, shared helpers
 ## Known limitations
 
 - **Chromium only.** The export pipeline depends on the Chrome DevTools Protocol.
-- **One tab per session**, and DevTools must be closed on it.
+- **One tab per session**
 - **`<video>`\*\*** elements and animated GIFs are not time-controlled.\*\* They play in real time, so they can run faster than expected during an export.
 - **The cursor does not fire real mouse events**, so the page will not show hover or click reactions under it.
 - **A page that busy-waits on the clock** (`while (Date.now() - t < n) {}`) can stall a frame during export. Dolly limits the wait and reports the problem, but that frame may be repeated.
