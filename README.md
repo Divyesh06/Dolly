@@ -4,7 +4,7 @@
 
 Dolly is a Chrome extension that turns a live web page into a product demo. Unlike a screen recorder, it doesn't record your screen. It renders the web page frame by frame.
 
-## ![Dolly Demo](./Dolly_Product_Demo.gif)
+https://github.com/user-attachments/assets/b4918451-f0e2-489f-ae31-8cef4289e313
 
 ## Contents
 
