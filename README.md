@@ -28,16 +28,15 @@ https://github.com/user-attachments/assets/b4918451-f0e2-489f-ae31-8cef4289e313
 
 **Rendered frames, not screen recordings.** Dolly builds every frame from the live page, applying CSS scale to it. This keeps text and UI sharp even when you zoom in 20× on a button.
 
-**Timeline-based editor.** Add Focus Regions, cursor keyframes, and script keyframes to the timeline. Dolly automatically handles the zoom and pan between regions, so the camera smoothly moves instead of cutting between shots.
+**Timeline-based editor.** Add Focus Regions, cursors, and script keyframes to the timeline. Dolly automatically handles the zoom and pan between regions, so the camera smoothly moves.
 
 **High-quality exports.** Export up to 4K at 60fps, regardless of your monitor's resolution. Every frame is rendered separately, so a slow machine or a heavy page won't cause dropped frames.
 
-**Scripted moments.** JavaScript keyframes run directly inside the page, with access to its DOM and globals. Dolly also includes `Dolly.type()` for typing effects and `Dolly.animate()` for animations using [animate.css](https://animate.style).
+**Scripted moments.** JavaScript keyframes run directly inside the page, with access to its DOM and globals. Dolly also includes helpers for typewriter and animation effects.
 
 ## Requirements
 
 - **Google Chrome**, or another Chromium-based browser such as Brave, Edge, or Vivaldi. Dolly uses the Chrome DevTools Protocol to control and capture the page. Firefox does not provide the APIs needed for exporting.
-- Nothing else is needed to install a release. Building from source requires **Node.js 22+** and **pnpm**.
 
 ## Installation
 
@@ -73,7 +72,7 @@ Either way, Dolly's icon will appear in the toolbar. Pin it so it's easy to acce
 
 2. Click the **Dolly** toolbar icon.
 
-   Your tab is moved into a clean popup window without the address bar or tab strip. This window becomes the video frame, while the Dolly controller opens beside it. The tab itself is moved rather than reopened, so its current state is preserved.
+   Your tab is moved into a clean popup window. This window becomes the video frame, while the Dolly controller opens below it.
 
 3. Choose an aspect ratio: 16:9, 9:16, 1:1, or a custom size.
 
@@ -97,7 +96,7 @@ A focus region tells Dolly what part of the page the camera should focus on. Dol
 
 Move a region on the timeline to change when it starts, or drag its edges to change how long it stays on screen.
 
-Regions can also point to content that is outside the current viewport. Dolly moves the camera there without scrolling the page.
+Regions can also point to content that is outside the current viewport. Dolly handles the scroll.
 
 ### Cursor — the pointer
 
@@ -105,7 +104,7 @@ Cursor keyframes add a pointer to the shot. The cursor smoothly moves between po
 
 The cursor is drawn inside the page, so it zooms along with the rest of the content.
 
-The cursor is only visual. It does not generate real mouse events, so it won't trigger hover states on the page.
+While moving, it sends real mouse events to the page, triggering states like hover.
 
 ### Script — JavaScript keyframes
 
@@ -121,7 +120,7 @@ For actions that happen over a period of time, use the helpers below.
 
 Script keyframes have access to a `Dolly` global. Both helpers start their work and return immediately. They stay synced with the shot even when an export takes much longer than the final video.
 
-### `Dolly.type(target, text, ms, options?)`
+### `Dolly.type(target, text, ms, { clear, focus })`
 
 Types text into an element one character at a time over `ms`.
 
@@ -139,18 +138,16 @@ Dolly uses the element's native setter and sends an `input` event, so frameworks
 | `clear` | `false` | Empty the element before typing |
 | `focus` | `true`  | Focus the element before typing |
 
-### `Dolly.animate(target, effect, ms, options?)`
+### `Dolly.animate(target, effect, ms, { delay, repeat, hold })`
 
 Plays an [animate.css](https://animate.style) effect over `ms`.
 
 ```js
 Dolly.animate(".price-tag", "bounceIn", 700);
-Dolly.animate("#toast", "fadeOutUp", 500, { delay: 200 });
+Dolly.animate(document.querySelector("#toast"), "fadeOutUp", 500, {
+  delay: 200,
+});
 ```
-
-All 97 animate.css effects are supported. You can use their normal names with or without the `animate__` prefix.
-
-The animate.css stylesheet is only added when a shot uses a script keyframe, so shots without scripts don't load it.
 
 | Option   | Default    | Meaning                                                    |
 | -------- | ---------- | ---------------------------------------------------------- |
@@ -177,8 +174,6 @@ Exporting takes longer than the final video's runtime because Dolly renders ever
 
 The final video is encoded as H.264 in an MP4 and downloaded when the export finishes.
 
-If an export is cancelled or fails, Dolly doesn't create a partial video.
-
 ## Keyboard shortcuts
 
 These work in both the controller and the page.
@@ -196,7 +191,7 @@ These work in both the controller and the page.
 
 Here are the main technical ideas behind Dolly.
 
-**The camera is a CSS transform on the page's root**, rather than a crop of a screenshot. Dolly sets the tab's viewport to the exact frame size and uses the required device scale for the output. This means a 4K export actually renders 4K pixels instead of taking a smaller screenshot and scaling it up. Frames are cropped, never resampled.
+**The camera is a CSS transform on the page's root**, rather than a crop of a screenshot. Dolly sets the tab's viewport to the exact frame size and uses the required device scale for the output. This means a 4K export actually renders 4K pixels instead of taking a smaller screenshot and scaling it up.
 
 **The page's clock is controlled during export.** Exporting a video frame by frame is much slower than real time. Without controlling the page's clock, animations and other time-based code would run at the wrong speed.
 
@@ -217,7 +212,7 @@ Dolly replaces `performance.now`, `Date`, timers, and `requestAnimationFrame`, a
 
 The overlay is **not** added to every page automatically. Dolly only injects it when you start a session.
 
-Nothing is sent anywhere. The page capture, video encoding, and final download all happen on your machine.
+No server is involved. The page capture, video encoding, and final download all happen on your machine.
 
 ## Development
 
@@ -247,15 +242,14 @@ lib/             camera, cursor and track maths, protocol, shared helpers
 
 - **Chromium only.** The export pipeline depends on the Chrome DevTools Protocol.
 - **One tab per session**
-- **`<video>`\*\*** elements and animated GIFs are not time-controlled.\*\* They play in real time, so they can run faster than expected during an export.
-- **The cursor does not fire real mouse events**, so the page will not show hover or click reactions under it.
+- **`<video>` elements and animated GIFs are not time-controlled.** They play in real time, so they can run faster than expected during an export.
 - **A page that busy-waits on the clock** (`while (Date.now() - t < n) {}`) can stall a frame during export. Dolly limits the wait and reports the problem, but that frame may be repeated.
 - **The page clock can stay behind real time after an export** by however much the export was ahead of the video. Reloading the page resets it.
 
 ## Future enhancements
 
-**A dedicated application instead of an extension.** An extension can control the page's view of time, but it can't control the browser's frame clock. Because of this, Dolly currently has to prepare and capture every frame separately. `HeadlessExperimental.beginFrame` can render a frame at an exact timestamp and return it in one call, which could make the entire export process deterministic. This would require bundling Chromium.
+**A dedicated application instead of an extension.** An extension can control the page's view of time, but it can't control the browser's frame clock. `HeadlessExperimental.beginFrame` can render a frame at an exact timestamp and return it in one call, which could make the entire export process deterministic. This would require bundling Chromium.
 
-**Saving your work.** There is currently no way to save a session, so every shot has to be created from scratch.
+**Saving your work.** There is currently no way to save a session upon closing the editor.
 
 **Type and animation effects on the timeline.** These are currently only available through script keyframes. They could eventually become their own timeline clips.

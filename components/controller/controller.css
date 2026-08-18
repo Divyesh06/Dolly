@@ -52,6 +52,50 @@ body {
   gap: 2px;
 }
 
+/* Page zoom: scales the recorded page's content, never the frame. */
+.dolly-zoom {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--dolly-divider);
+  border-radius: 999px;
+  background: var(--dolly-surface);
+}
+.dolly-zoom__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dolly-text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.dolly-zoom__step:hover:not(:disabled) {
+  background: var(--dolly-hover);
+  color: var(--dolly-text);
+}
+.dolly-zoom__step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.dolly-zoom__read {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Wide enough for "200%" and no wider, so the control does not jump. */
+  min-width: 40px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dolly-text);
+  user-select: none;
+}
+
 .dolly-icon-button {
   display: inline-flex;
   align-items: center;

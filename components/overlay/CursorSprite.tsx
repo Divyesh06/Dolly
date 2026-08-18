@@ -47,12 +47,42 @@ export type CursorSpriteProps = {
   y: number;
   scale: number;
   icon: CursorIcon;
+  /** An uploaded cursor, drawn instead of the glyph. */
+  image?: string;
+  hotspot?: { x: number; y: number };
 };
 
-/** The glyph alone — no interaction. Used for the live cursor during a shot. */
-export function CursorSprite({ x, y, scale, icon }: CursorSpriteProps) {
-  const glyph = glyphFor(icon);
+/** An uploaded cursor's tip, defaulting to where a pointer's usually is. */
+const IMAGE_HOTSPOT = { x: 0, y: 0 };
+
+/** The cursor alone — no interaction. Used for the live cursor during a shot. */
+export function CursorSprite({
+  x,
+  y,
+  scale,
+  icon,
+  image,
+  hotspot,
+}: CursorSpriteProps) {
   const size = CURSOR_BASE_SIZE * scale;
+
+  if (image) {
+    const spot = hotspot ?? IMAGE_HOTSPOT;
+    return (
+      <img
+        class="dolly-cursor dolly-cursor--image"
+        src={image}
+        style={{
+          height: size,
+          left: x - spot.x * size,
+          top: y - spot.y * size,
+        }}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  const glyph = glyphFor(icon);
   return (
     <svg
       class="dolly-cursor"
@@ -78,6 +108,8 @@ export type CursorHandleProps = CursorSpriteProps & {
   onSelect: () => void;
   onChange: (patch: { x?: number; y?: number; scale?: number }) => void;
   onChangeIcon: (icon: CursorIcon) => void;
+  /** An uploaded cursor, or null to go back to the built-in glyphs. */
+  onChangeImage: (image: string | null) => void;
   onDragEnd?: () => void;
   snapMove?: (point: { x: number; y: number }) => { x: number; y: number };
 };
@@ -88,23 +120,28 @@ export function CursorHandle({
   y,
   scale,
   icon,
+  image,
+  hotspot,
   selected,
   boundsWidth,
   boundsHeight,
   onSelect,
   onChange,
   onChangeIcon,
+  onChangeImage,
   onDragEnd,
   snapMove,
 }: CursorHandleProps) {
   const glyph = glyphFor(icon);
   const size = CURSOR_BASE_SIZE * scale;
-  const left = x - glyph.hotspot.x * size;
-  const top = y - glyph.hotspot.y * size;
+  const spot = image ? (hotspot ?? IMAGE_HOTSPOT) : glyph.hotspot;
+  const left = x - spot.x * size;
+  const top = y - spot.y * size;
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const labelRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Dismiss on outside press or Escape. Registration is deferred a tick so the
   // press that opened the picker doesn't immediately close it.
@@ -219,10 +256,12 @@ export function CursorHandle({
               <button
                 key={option}
                 class={`dolly-cursor-picker__item ${
-                  option === icon ? 'is-active' : ''
+                  option === icon && !image ? 'is-active' : ''
                 }`}
                 onClick={(e) => {
                   e.stopPropagation();
+                  // Picking a glyph drops whatever was uploaded.
+                  onChangeImage(null);
                   onChangeIcon(option);
                   setPickerOpen(false);
                 }}
@@ -239,18 +278,88 @@ export function CursorHandle({
               </button>
             );
           })}
+
+          <button
+            class={`dolly-cursor-picker__item ${image ? 'is-active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              fileRef.current?.click();
+            }}
+            title="PNG or SVG. SVG stays crisp however far the camera zooms."
+          >
+            {image ? (
+              <img
+                class="dolly-cursor-picker__swatch"
+                src={image}
+                width={SWATCH_SIZE}
+                height={SWATCH_SIZE}
+                aria-hidden="true"
+              />
+            ) : (
+              <svg
+                width={SWATCH_SIZE}
+                height={SWATCH_SIZE}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 19V5" />
+                <path d="m6 11 6-6 6 6" />
+                <path d="M5 21h14" />
+              </svg>
+            )}
+            <span>{image ? 'Replace' : 'Upload'}</span>
+          </button>
+
+          <input
+            ref={fileRef}
+            class="dolly-cursor-picker__file"
+            type="file"
+            accept="image/svg+xml,image/png,image/webp,image/gif"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const input = e.currentTarget as HTMLInputElement;
+              const file = input.files?.[0];
+              // Cleared either way, so picking the same file twice still fires.
+              input.value = '';
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result !== 'string') return;
+                onChangeImage(reader.result);
+                setPickerOpen(false);
+              };
+              reader.onerror = () =>
+                console.warn('[Dolly] could not read that cursor image');
+              // A data URL, so it travels in a message and needs no host.
+              reader.readAsDataURL(file);
+            }}
+          />
         </div>
       )}
 
-      <svg
-        class="dolly-cursor-handle__glyph"
-        width={size}
-        height={size}
-        viewBox={glyph.viewBox}
-        aria-hidden="true"
-      >
-        <GlyphPaths glyph={glyph} />
-      </svg>
+      {image ? (
+        <img
+          class="dolly-cursor-handle__glyph"
+          src={image}
+          style={{ height: size, width: 'auto' }}
+          aria-hidden="true"
+        />
+      ) : (
+        <svg
+          class="dolly-cursor-handle__glyph"
+          width={size}
+          height={size}
+          viewBox={glyph.viewBox}
+          aria-hidden="true"
+        >
+          <GlyphPaths glyph={glyph} />
+        </svg>
+      )}
 
       {selected && (
         <div

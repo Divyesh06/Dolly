@@ -1,5 +1,6 @@
 import animateCss from 'animate.css/animate.min.css?raw';
 import { withTimeout } from '@/lib/async';
+import { DRAWN_CARET_ID } from './caret';
 
 /**
  * `window.Dolly` — the helpers a script keyframe can call.
@@ -18,9 +19,20 @@ const INSTALL_TIMEOUT_MS = 3000;
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** Returns true if this call is what installed it, false if it was there. */
-function installDollyApi(): boolean {
+function installDollyApi(caretId: string): boolean {
   const win = window as unknown as Record<string, unknown>;
-  if (win.Dolly) return false;
+
+  /*
+   * Always replaced, never skipped. A recorded tab is moved between windows
+   * but never reloaded, so `window.Dolly` outlives a take — bailing out when
+   * one is already there would leave the page running whichever version of
+   * this API its first take injected, for the rest of the document's life.
+   *
+   * The stylesheet is what must not be repeated, so it gets its own marker.
+   */
+  const cssMarker = `${caretId}-css`;
+  const needsStylesheet = !win[cssMarker];
+  win[cssMarker] = true;
 
   type Target = string | Element | null | undefined;
 
@@ -67,6 +79,139 @@ function installDollyApi(): boolean {
     }
   };
 
+  /**
+   * Document coordinates, walked through the offset chain rather than read
+   * from `getBoundingClientRect`. The camera is a transform on the page root,
+   * and a rect would carry that transform — offsets are layout-only, so the
+   * caret stays put however the shot moves.
+   *
+   * These are the *body's* coordinates, which page zoom scales. Anything
+   * positioned from them has to sit inside the body to share that scale, or it
+   * drifts further off the further along the text it goes.
+   */
+  const documentOffset = (el: HTMLElement) => {
+    let x = 0;
+    let y = 0;
+    let node: HTMLElement | null = el;
+    while (node) {
+      x += node.offsetLeft;
+      y += node.offsetTop;
+      const parent = node.offsetParent as HTMLElement | null;
+      if (parent) {
+        x -= parent.scrollLeft;
+        y -= parent.scrollTop;
+      }
+      node = parent;
+    }
+    return { x, y };
+  };
+
+  /** How wide `text` renders in `el`'s own font. */
+  const textWidth = (el: HTMLElement, text: string): number => {
+    let mirror = document.getElementById(`${caretId}-mirror`);
+    if (!mirror) {
+      mirror = document.createElement('span');
+      mirror.id = `${caretId}-mirror`;
+      mirror.setAttribute('aria-hidden', 'true');
+      mirror.style.cssText =
+        'position:absolute;left:-9999px;top:0;visibility:hidden;' +
+        'white-space:pre;pointer-events:none;';
+      document.body.appendChild(mirror);
+    }
+    const cs = getComputedStyle(el);
+    // Copied one by one: the `font` shorthand is not reliably readable from a
+    // computed style.
+    mirror.style.fontFamily = cs.fontFamily;
+    mirror.style.fontSize = cs.fontSize;
+    mirror.style.fontWeight = cs.fontWeight;
+    mirror.style.fontStyle = cs.fontStyle;
+    mirror.style.letterSpacing = cs.letterSpacing;
+    mirror.style.textTransform = cs.textTransform;
+    mirror.textContent = text;
+    return mirror.offsetWidth;
+  };
+
+  /**
+   * Dolly's own caret, in place of the native one.
+   *
+   * A native caret blinks on a browser timer that runs on real time, so across
+   * a capture — where a second of video costs many seconds — it strobes. This
+   * one is a plain element: it does not blink, and it takes the field's own
+   * caret colour, so it reads as that page's caret rather than Dolly's.
+   *
+   * Single-line fields only. A textarea wraps, and finding the caret's line
+   * would mean re-implementing the line breaker.
+   */
+  const drawCaret = (el: HTMLElement, text: string) => {
+    if (!(el instanceof HTMLInputElement)) return;
+
+    const cs = getComputedStyle(el);
+    const padLeft = parseFloat(cs.paddingLeft) || 0;
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const borderTop = parseFloat(cs.borderTopWidth) || 0;
+    const padRight = parseFloat(cs.paddingRight) || 0;
+    const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
+    const content = Math.max(0, el.clientWidth - padLeft - padRight);
+    const measured = textWidth(el, text);
+
+    let offset: number;
+    if (cs.textAlign === 'right' || cs.textAlign === 'end') {
+      offset = padLeft + content;
+    } else if (cs.textAlign === 'center') {
+      offset = padLeft + content / 2 + measured / 2;
+    } else {
+      offset = padLeft + measured;
+    }
+    // Never past the content box, and never behind it once the text scrolls.
+    offset = Math.max(padLeft, Math.min(offset, padLeft + content));
+    offset -= el.scrollLeft;
+
+    let caret = document.getElementById(caretId);
+    if (!caret) {
+      caret = document.createElement('div');
+      caret.id = caretId;
+      caret.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(caret);
+    }
+
+    /*
+     * The field's own caret colour, read before it is hidden and then kept on
+     * the element: a second call would otherwise read back the transparent set
+     * here. `auto` and `transparent` fall through to the text colour, which is
+     * what `auto` resolves to anyway. Doubles as the marker teardown looks for.
+     */
+    let colour = el.getAttribute('data-dolly-caret');
+    if (colour === null) {
+      const declared = cs.caretColor;
+      colour =
+        declared && declared !== 'auto' && declared !== 'transparent'
+          ? declared
+          : cs.color;
+      el.setAttribute('data-dolly-caret', colour);
+      el.style.setProperty('caret-color', 'transparent');
+    }
+
+    /*
+     * Sized in the field's own font, so it follows whatever the type is set at:
+     * 1.25em tall — a little over the text, as a caret should be — and a hair
+     * over a pixel wide. The margin is the gap back to the text.
+     *
+     * Centred on the *content* box rather than the border box, so uneven
+     * padding cannot push it off, and by translation, so nothing here has to
+     * resolve the em height into pixels.
+     */
+    const { x, y } = documentOffset(el);
+    const middle = y + borderTop + padTop + (el.clientHeight - padTop - padBottom) / 2;
+    caret.style.cssText =
+      'position:absolute;z-index:2147483646;pointer-events:none;' +
+      `background:${colour};font-size:${cs.fontSize};` +
+      'height:1.25em;width:max(1px, 0.07em);margin-left:0.14em;' +
+      'transform:translateY(-50%);' +
+      `left:${Math.round(x + borderLeft + offset)}px;` +
+      `top:${Math.round(middle)}px;`;
+  };
+
   const Dolly = {
     /**
      * Type `text` into an element over `ms`, a character at a time.
@@ -100,11 +245,16 @@ function installDollyApi(): boolean {
 
       const base = opts.clear ? '' : readText(el);
       if (opts.clear) write(el, '', false);
+      // Drawn only where the caret belongs: a field nothing is typing into,
+      // or one left unfocused, should not sprout one.
+      const caret = opts.focus !== false;
+      if (caret) drawCaret(el, base);
       if (!value) return;
 
       // No duration asked for: put it all in at this instant.
       if (total === 0) {
         write(el, base + value, true);
+        if (caret) drawCaret(el, base + value);
         return;
       }
 
@@ -114,7 +264,10 @@ function installDollyApi(): boolean {
         const last = i === value.length;
         // The page's own timer, read live: during an export that is the
         // stepped clock.
-        setTimeout(() => write(el, shown, last), Math.round(perCharacter * i));
+        setTimeout(() => {
+          write(el, shown, last);
+          if (caret) drawCaret(el, shown);
+        }, Math.round(perCharacter * i));
       }
     },
 
@@ -175,15 +328,16 @@ function installDollyApi(): boolean {
   };
 
   win.Dolly = Dolly;
-  return true;
+  return needsStylesheet;
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
 
 /**
  * Make `window.Dolly` available to script keyframes in the recorded page.
- * Cheap to call repeatedly: the stylesheet only follows a fresh install, which
- * is also what makes it correct across a navigation.
+ * Cheap to call repeatedly: the API is replaced each time, so a rebuilt
+ * extension takes effect without reloading the page, while the stylesheet
+ * follows only a document that has not had it yet.
  */
 export async function installPageApi(targetTabId: number): Promise<boolean> {
   try {
@@ -192,14 +346,16 @@ export async function installPageApi(targetTabId: number): Promise<boolean> {
         target: { tabId: targetTabId },
         world: 'MAIN',
         func: installDollyApi,
+        args: [DRAWN_CARET_ID],
       } as Parameters<typeof browser.scripting.executeScript>[0]),
       INSTALL_TIMEOUT_MS,
       'installing the page API',
     );
     if (!results) return false;
 
-    const fresh = results.some((r) => r?.result === true);
-    if (fresh) {
+    // The API is re-installed every time; only the stylesheet is once-only.
+    const needsStylesheet = results.some((r) => r?.result === true);
+    if (needsStylesheet) {
       await withTimeout(
         browser.scripting.insertCSS({
           target: { tabId: targetTabId },

@@ -97,7 +97,7 @@ export type EditCommand =
 export type EffectPatch = Partial<
   Pick<FocusRegion, 'startTime' | 'endTime' | 'x' | 'y' | 'width' | 'height'>
 > &
-  Partial<Pick<CursorPoint, 'scale' | 'icon'>>;
+  Partial<Pick<CursorPoint, 'scale' | 'icon' | 'image' | 'hotspot'>>;
 
 export type EditNotice =
   | { channel: typeof EDIT_CHANNEL; op: 'select'; id: string }

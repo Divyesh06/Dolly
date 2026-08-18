@@ -26,6 +26,7 @@ import {
 } from './layout';
 import { installPageApi } from './pageApi';
 import { executeInPage } from './pageScript';
+import { applyPageZoom, DEFAULT_ZOOM } from './pageZoom';
 import { useExport } from './useExport';
 import { usePlayback } from './usePlayback';
 import { useTracks } from './useTracks';
@@ -51,7 +52,22 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
   const [isExporting, setIsExporting] = useState(false);
   /** The largest rectangle of the chosen aspect ratio the page window can be. */
   const [frame, setFrame] = useState<Size>(() => initialFrame(aspectW, aspectH));
+  /** CSS zoom on the recorded page, as a percentage. */
+  const [pageZoom, setPageZoomState] = useState(DEFAULT_ZOOM);
   const target = useRef(readTarget()).current;
+
+  /**
+   * Zoom the page's content. The viewport is untouched, so the frame, the
+   * camera and the overlay all stay as they are — only what is inside scales.
+   */
+  const setPageZoom = useCallback(
+    async (percent: number) => {
+      if (target.tabId == null) return;
+      setPageZoomState(percent);
+      await applyPageZoom(target.tabId, percent);
+    },
+    [target],
+  );
 
   const send = useCallback(
     async (req: OverlayRequest): Promise<OverlayResponse> => {
@@ -160,6 +176,7 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
     regions: tracks.regions,
     cursors: tracks.cursors,
     frame,
+    target,
     shotDuration: tracks.shotDuration,
     setPose,
     runScriptsBetween,
@@ -457,6 +474,8 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
       editorWindowsRef.current.clear();
       if (target.tabId == null) return;
       void send({ channel: OVERLAY_CHANNEL, op: 'release' });
+      // The zoom is ours, so it goes with the session.
+      void applyPageZoom(target.tabId, DEFAULT_ZOOM);
       void releaseTab(target.tabId);
     };
     window.addEventListener('pagehide', onPageHide);
@@ -472,6 +491,8 @@ export function useController({ aspectW, aspectH }: UseControllerArgs) {
     isExporting,
     playheadTime: playback.playheadTime,
     status,
+    pageZoom,
+    setPageZoom,
     windowFitted: workspace.windowFitted,
     shotDuration: tracks.shotDuration,
     canUndo: tracks.canUndo,

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { withTimeout } from '@/lib/async';
-import { buildTimeline, cameraAt, type Camera } from '@/lib/camera';
+import {
+  buildTimeline,
+  cameraAt,
+  toFramePoint,
+  type Camera,
+} from '@/lib/camera';
 import { buildCursorTrack, cursorAt, type CursorPose } from '@/lib/cursor';
 import type { CursorPoint, FocusRegion } from '@/lib/effects';
 import {
@@ -16,6 +21,8 @@ import {
   releaseTab,
   type CaptureSession,
 } from './capture';
+import { removeDrawnCaret } from './caret';
+import { openCursorInput, type CursorInput } from './cursorInput';
 import { getBounds, type SessionTarget, type Size } from './layout';
 import { renderVideo, type RenderResult } from './renderer';
 import { openPageClock, type PageClock } from './virtualClock';
@@ -254,6 +261,7 @@ export function useExport({
       let session: CaptureSession | null = null;
       let stopAnsweringDialogs: (() => Promise<void>) | null = null;
       let pageClock: PageClock | null = null;
+      let pointer: CursorInput | null = null;
       let result: RenderResult | null = null;
       let failure: string | null = null;
       let width = evenFloor(opts.width);
@@ -288,6 +296,11 @@ export function useExport({
           );
         }
 
+        // The drawn cursor moves the real pointer with it, so the page lights
+        // up under it as it would for a hand. The capture session already
+        // holds the debugger this needs.
+        pointer = await openCursorInput(tabId, frame);
+
         let poseMisses = 0;
         resetTake();
         let lastTime = -1e-6;
@@ -306,13 +319,38 @@ export function useExport({
             stalls.mark('page clock');
             await pageClock?.step((t - lastTime) * 1000);
             lastTime = t;
+            const camera = cameraAt(timeline, t);
+            const cursor = cursorAt(cursorTrack, t);
+
+            /*
+             * With a pointer to drive, the pose is applied and settled in two
+             * parts. Hit testing reads the page as it stands, so the camera
+             * transform has to be on before the pointer moves — otherwise the
+             * move lands on whatever the previous frame had under it, which at
+             * high zoom is a different element entirely. The settle has to come
+             * after, or the hover styles it triggers miss this frame.
+             */
             stalls.mark('pose');
             const res = await withTimeout(
-              setPose(cameraAt(timeline, t), cursorAt(cursorTrack, t), true),
+              setPose(camera, cursor, !pointer),
               POSE_TIMEOUT_MS,
               'pose',
             );
             if (!res?.ok) poseMisses++;
+
+            if (pointer) {
+              stalls.mark('pointer');
+              await pointer.moveTo(
+                cursor ? toFramePoint(camera, cursor) : null,
+              );
+              stalls.mark('settle');
+              const settled = await withTimeout(
+                setPose(camera, cursor, true),
+                POSE_TIMEOUT_MS,
+                'settle',
+              );
+              if (!settled?.ok) poseMisses++;
+            }
             stalls.mark('capture');
           },
           captureFrame: () => session!.grab(),
@@ -339,6 +377,7 @@ export function useExport({
         // The clock first: everything after this wants the page behaving
         // normally again.
         await pageClock?.release();
+        await pointer?.release();
         // Bounded, because a page that stopped answering is exactly when an
         // export fails, and the failure still has to be reported.
         await withTimeout(
@@ -346,6 +385,8 @@ export function useExport({
           CLEANUP_TIMEOUT_MS,
           'stop answering dialogs',
         );
+        // Whatever `Dolly.type` drew, and the fields it hid a caret on.
+        await removeDrawnCaret(tabId);
         await withTimeout(
           setPose(null, null, false),
           CLEANUP_TIMEOUT_MS,

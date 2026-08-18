@@ -36,6 +36,16 @@ export type CursorPoint = TimeSpan & {
   /** Multiplier on CURSOR_BASE_SIZE. */
   scale: number;
   icon: CursorIcon;
+  /**
+   * An uploaded cursor as a data URL, which takes the place of `icon` when set.
+   * `scale` sets its height and its aspect ratio is kept.
+   */
+  image?: string;
+  /**
+   * Where the tip sits inside an uploaded image, in fractions of its drawn box.
+   * Defaults to the top-left corner, where a pointer's point usually is.
+   */
+  hotspot?: { x: number; y: number };
   /** Hides the editing handle only; the cursor still appears in the shot. */
   hidden?: boolean;
 };
@@ -63,6 +73,8 @@ export const DEFAULT_JS_CODE = `// Runs when the playhead reaches this point.
 // Two external APIs are also available here:
 //   Dolly.type(el, text, ms, { clear, focus })
 //   Dolly.animate(el, effect, ms, { delay, repeat, hold }) //Uses animate.css - https://animate.style/
+//
+// Full reference: https://github.com/Divyesh06/Dolly#the-script-api
 `;
 
 export const DEFAULT_REGION_DURATION = 2;

@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { buildTimeline, cameraAt, type Camera } from '@/lib/camera';
+import {
+  buildTimeline,
+  cameraAt,
+  toFramePoint,
+  type Camera,
+} from '@/lib/camera';
 import { buildCursorTrack, cursorAt, type CursorPose } from '@/lib/cursor';
 import type { CursorPoint, FocusRegion } from '@/lib/effects';
 import type { OverlayResponse } from '@/lib/protocol';
-import type { Size } from './layout';
+import { openCursorInput, type CursorInput } from './cursorInput';
+import type { SessionTarget, Size } from './layout';
 
 export type UsePlaybackArgs = {
   status: 'connecting' | 'ready' | 'lost';
@@ -13,6 +19,7 @@ export type UsePlaybackArgs = {
   regions: FocusRegion[];
   cursors: CursorPoint[];
   frame: Size;
+  target: SessionTarget;
   shotDuration: number;
   setPose: (
     camera: Camera | null,
@@ -24,7 +31,13 @@ export type UsePlaybackArgs = {
   resetTake: () => void;
 };
 
-/** Previewing the shot in real time, in the live page. */
+/**
+ * Previewing the shot in real time, in the live page.
+ *
+ * A shot with a cursor takes the debugger for the length of playback so the
+ * pointer can be driven, and gives it straight back — so the banner is up only
+ * while it is needed.
+ */
 export function usePlayback({
   status,
   isPlaying,
@@ -33,6 +46,7 @@ export function usePlayback({
   regions,
   cursors,
   frame,
+  target,
   shotDuration,
   setPose,
   runScriptsBetween,
@@ -40,15 +54,31 @@ export function usePlayback({
 }: UsePlaybackArgs) {
   const [playheadTime, setPlayheadTime] = useState(0);
   const rafRef = useRef<number | null>(null);
+  const pointerRef = useRef<CursorInput | null>(null);
+  /**
+   * Bumped whenever a take starts or stops, so work that began during one can
+   * tell it has been superseded. Taking the debugger is an await, and a stop
+   * landing inside it would otherwise leave the attachment orphaned.
+   */
+  const takeRef = useRef(0);
+
+  /** Hands the debugger back, which is what drops the banner. */
+  const dropPointer = useCallback(() => {
+    const pointer = pointerRef.current;
+    pointerRef.current = null;
+    void pointer?.release();
+  }, []);
 
   const stop = useCallback(() => {
+    takeRef.current++;
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
+    dropPointer();
     void setPose(null, null, false);
     setIsPlaying(false);
-  }, [setPose, setIsPlaying]);
+  }, [setPose, setIsPlaying, dropPointer]);
 
   const play = useCallback(async () => {
     if (rafRef.current !== null || isExporting || status !== 'ready') return;
@@ -60,9 +90,24 @@ export function usePlayback({
     if (duration <= 0) return;
 
     const startFrom = playheadTime >= duration ? 0 : playheadTime;
+    const take = ++takeRef.current;
     setPlayheadTime(startFrom);
     setIsPlaying(true);
     resetTake();
+
+    // Only for a shot that has a cursor: nothing else here needs the debugger,
+    // and its banner should not appear for a camera-only preview.
+    if (target.tabId != null && cursorTrack.duration > 0) {
+      const pointer = await openCursorInput(target.tabId, frame, { own: true });
+      // Stopped, or restarted, while that was attaching. Hand the debugger
+      // straight back — nothing else is going to — and leave the take that
+      // superseded this one to own the state.
+      if (takeRef.current !== take) {
+        void pointer?.release();
+        return;
+      }
+      pointerRef.current = pointer;
+    }
     // Just below the start, so a keyframe sitting exactly there still fires.
     let lastTime = startFrom - 1e-6;
 
@@ -73,6 +118,7 @@ export function usePlayback({
         setPlayheadTime(duration);
         rafRef.current = null;
         void runScriptsBetween(lastTime, duration);
+        dropPointer();
         void setPose(null, null, false);
         setIsPlaying(false);
         return;
@@ -82,7 +128,14 @@ export function usePlayback({
       // camera. Export does await.
       void runScriptsBetween(lastTime, t);
       lastTime = t;
-      void setPose(cameraAt(timeline, t), cursorAt(cursorTrack, t), false);
+      const camera = cameraAt(timeline, t);
+      const cursor = cursorAt(cursorTrack, t);
+      void setPose(camera, cursor, false);
+      // After the pose, so the hit test reads the camera it belongs to. A
+      // frame's lag on the hover is invisible at playback speed.
+      void pointerRef.current?.moveTo(
+        cursor ? toFramePoint(camera, cursor) : null,
+      );
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -93,10 +146,12 @@ export function usePlayback({
     isExporting,
     status,
     frame,
+    target,
     setPose,
     runScriptsBetween,
     resetTake,
     setIsPlaying,
+    dropPointer,
   ]);
 
   const seek = useCallback(
@@ -109,7 +164,10 @@ export function usePlayback({
 
   useEffect(() => {
     return () => {
+      // Bumped first, so an attach still in flight releases itself.
+      takeRef.current++;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      void pointerRef.current?.release();
     };
   }, []);
 

@@ -65,6 +65,21 @@ export const OVERLAY_STYLES = `
   pointer-events: auto;
   cursor: move;
 }
+/* An uploaded cursor: its height follows the scale, its aspect is its own. */
+.dolly-cursor--image {
+  width: auto;
+  height: auto;
+}
+
+.dolly-cursor-picker__swatch {
+  object-fit: contain;
+}
+
+/* Driven by the Upload tile beside it, never shown. */
+.dolly-cursor-picker__file {
+  display: none;
+}
+
 .dolly-cursor-handle__glyph {
   display: block;
   overflow: visible;

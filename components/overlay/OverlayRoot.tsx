@@ -108,6 +108,12 @@ export function OverlayRoot({
   const visibleRegions = regions.filter((region) => !region.hidden);
   const visibleCursors = cursors.filter((cursor) => !cursor.hidden);
 
+  // The pose names a keyframe rather than carrying its image; the list it names
+  // arrived with the last render, before the take started.
+  const liveCursor = livePose?.imageId
+    ? cursors.find((cursor) => cursor.id === livePose.imageId)
+    : undefined;
+
   return (
     <div>
       <div class="dolly-stage">
@@ -117,6 +123,8 @@ export function OverlayRoot({
             y={livePose.y}
             scale={livePose.scale}
             icon={livePose.icon}
+            image={liveCursor?.image}
+            hotspot={liveCursor?.hotspot}
           />
         )}
       </div>
@@ -155,6 +163,8 @@ export function OverlayRoot({
             y={cursor.y}
             scale={cursor.scale}
             icon={cursor.icon}
+            image={cursor.image}
+            hotspot={cursor.hotspot}
             selected={cursor.id === selectedId}
             boundsWidth={boundsWidth}
             boundsHeight={boundsHeight}
@@ -163,6 +173,12 @@ export function OverlayRoot({
             onSelect={() => onSelect(cursor.id)}
             onChange={(patch) => onChangeCursor(cursor.id, patch)}
             onChangeIcon={(next) => onChangeCursor(cursor.id, { icon: next })}
+            onChangeImage={(next) =>
+              onChangeCursor(cursor.id, {
+                image: next ?? undefined,
+                hotspot: next ? { x: 0, y: 0 } : undefined,
+              })
+            }
           />
         ))}
       </div>

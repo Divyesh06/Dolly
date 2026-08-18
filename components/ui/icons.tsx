@@ -81,6 +81,29 @@ export function MinusIcon(props: IconProps) {
   );
 }
 
+/** lucide `zoom-in`. */
+export function ZoomInIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+      <path d="M11 8v6" />
+      <path d="M8 11h6" />
+    </Glyph>
+  );
+}
+
+/** lucide `zoom-out`. */
+export function ZoomOutIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+      <path d="M8 11h6" />
+    </Glyph>
+  );
+}
+
 export function EyeIcon(props: IconProps) {
   return (
     <Glyph {...props}>

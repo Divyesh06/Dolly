@@ -66,6 +66,22 @@ function blendCameras(a: Camera, b: Camera, progress: number): Camera {
   };
 }
 
+/**
+ * Where a document point lands in the frame under `camera`. The page's root
+ * carries this same transform with a `0 0` origin, so anything drawn at a
+ * document coordinate appears here — and since the tab is emulated to the
+ * frame's size, frame space and viewport space are the same during a take.
+ */
+export function toFramePoint(
+  camera: Camera,
+  point: { x: number; y: number },
+): { x: number; y: number } {
+  return {
+    x: camera.translateX + camera.scale * point.x,
+    y: camera.translateY + camera.scale * point.y,
+  };
+}
+
 /** Sample the timeline; identity before the first region. */
 export function cameraAt(timeline: Timeline, t: number): Camera {
   return (
